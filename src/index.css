@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --bg: #f8f8f6;
+  --card: #ffffff;
+  --border: #e5e5e5;
+  --text: #1a1a1a;
+  --text-muted: #6b7280;
+  --text-subtle: #9ca3af;
+  --accent: #1a1a1a;
+  --accent-hover: #2d2d2d;
+  --input-bg: #f9f9f9;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: #0f0f0f;
+  --card: #1a1a1a;
+  --border: #2a2a2a;
+  --text: #f5f5f5;
+  --text-muted: #a1a1aa;
+  --text-subtle: #71717a;
+  --accent: #f5f5f5;
+  --accent-hover: #e5e5e5;
+  --input-bg: #222222;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+  font-family: 'Satoshi', 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#root {
+  background-color: var(--bg);
+  min-height: 100vh;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in    { animation: fadeIn 0.35s ease forwards; }
+.animate-modal-in   { animation: fadeInScale 0.25s ease forwards; }
+.animate-overlay-in { animation: overlayIn 0.2s ease forwards; }
+.animate-slide-up   { animation: slideUp 0.4s ease forwards; }
+
+.stagger-1 { animation-delay: 0.05s; opacity: 0; }
+.stagger-2 { animation-delay: 0.1s;  opacity: 0; }
+.stagger-3 { animation-delay: 0.15s; opacity: 0; }
+.stagger-4 { animation-delay: 0.2s;  opacity: 0; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ===== RESPONSIVE ===== */
+
+/* Mobile (< 640px) */
+@media (max-width: 640px) {
+  .expenses-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .wallets-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* Tablet (640px - 960px) */
+@media (max-width: 960px) {
+  .expenses-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Mobile fixes */
+@media (max-width: 480px) {
+  input, select, button {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+}
