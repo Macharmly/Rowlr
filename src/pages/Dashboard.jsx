@@ -26,7 +26,9 @@ const CATEGORIES = ['All', 'Food', 'Transport', 'Shopping', 'Bills', 'Health', '
 const TABS = ['Expenses', 'Analytics', 'Budgets', 'Wallets & Income', 'Bills', 'Loans', 'Savings', 'Net Worth', 'Notes', 'Calendar', 'Score']
 
 function useWindowWidth() {
-  const [width, setWidth] = useState(window.innerWidth)
+  const [width, setWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1024
+  )
   useEffect(() => {
     const handler = () => setWidth(window.innerWidth)
     window.addEventListener('resize', handler)
@@ -71,6 +73,13 @@ export default function Dashboard({ user, dark, setDark }) {
       supabase.from('loans').select('*').eq('user_id', user.id),
       supabase.from('savings_goals').select('*').eq('user_id', user.id),
     ])
+
+    if (w.error) console.error('Error fetching wallets:', w.error)
+    if (i.error) console.error('Error fetching income:', i.error)
+    if (b.error) console.error('Error fetching bills:', b.error)
+    if (l.error) console.error('Error fetching loans:', l.error)
+    if (s.error) console.error('Error fetching savings goals:', s.error)
+
     setWalletsList(w.data || [])
     setIncomeList(i.data || [])
     setBillsList(b.data || [])
@@ -80,34 +89,81 @@ export default function Dashboard({ user, dark, setDark }) {
 
   async function fetchBudgets() {
     const now = new Date()
-    const { data } = await supabase.from('budgets').select('*')
+
+    const { data, error } = await supabase
+      .from('budgets')
+      .select('*')
       .eq('user_id', user.id)
       .eq('month', now.getMonth() + 1)
       .eq('year', now.getFullYear())
+
+    if (error) {
+      console.error('Error fetching budgets:', error)
+      setBudgets([])
+      return
+    }
+
     setBudgets(data || [])
   }
 
   async function fetchProfile() {
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    if (data) setProfile(data)
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (error) {
+      console.error('Error fetching profile:', error)
+      setProfile(null)
+      return
+    }
+
+    setProfile(data || null)
   }
 
   async function fetchExpenses() {
     setLoading(true)
-    let query = supabase.from('expenses').select('*').eq('user_id', user.id).order('date', { ascending: false }).order('created_at', { ascending: false })
+
+    let query = supabase
+      .from('expenses')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+
     const now = new Date()
+
     if (dateFilter === 'this_week') {
-      const start = new Date(now); start.setDate(now.getDate() - now.getDay())
+      const start = new Date(now)
+      start.setDate(now.getDate() - now.getDay())
+
       query = query.gte('date', start.toISOString().split('T')[0])
+
     } else if (dateFilter === 'this_month') {
-      query = query.gte('date', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`)
+      query = query.gte(
+        'date',
+        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      )
+
     } else if (dateFilter === 'last_month') {
       const s = new Date(now.getFullYear(), now.getMonth() - 1, 1)
       const e = new Date(now.getFullYear(), now.getMonth(), 0)
-      query = query.gte('date', s.toISOString().split('T')[0]).lte('date', e.toISOString().split('T')[0])
+
+      query = query
+        .gte('date', s.toISOString().split('T')[0])
+        .lte('date', e.toISOString().split('T')[0])
     }
-    const { data } = await query
-    setExpenses(data || [])
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching expenses:', error)
+      setExpenses([])
+    } else {
+      setExpenses(data || [])
+    }
+
     setLoading(false)
   }
 
