@@ -56,6 +56,7 @@ import FinancialScore from '../components/FinancialScore'
 import SavingsGoals from '../components/SavingsGoals'
 import FinancialNotes from '../components/FinancialNotes'
 import NetWorth from '../components/NetWorth'
+import ExpensePlansSection from '../components/ExpensePlansSection'
 
 const CATEGORIES = [
   'All',
@@ -76,6 +77,7 @@ const TABS = [
   'Budgets',
   'Wallets & Income',
   'Bills',
+  'Expense Plans',
   'Loans',
   'Savings',
   'Net Worth',
@@ -2094,6 +2096,18 @@ export default function Dashboard({
             userId={user.id}
             currency={currency}
             rate={rate}
+          />
+        ) : activeTab === 'Expense Plans' ? (
+          <ExpensePlansSection
+            userId={user.id}
+            currency={currency}
+            rate={rate}
+            onExpenseCreated={(expense) =>
+              setExpenses((previous) => [
+                expense,
+                ...previous,
+              ])
+            }
           />
         ) : activeTab === 'Loans' ? (
           <LoansSection
