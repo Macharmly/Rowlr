@@ -16,6 +16,7 @@ import {
   Wallet,
   Utensils,
   CircleDollarSign,
+  Pencil,
 } from 'lucide-react'
 
 import { supabase } from '../lib/supabase'
@@ -249,14 +250,15 @@ function FormActions({
 
 function PlanModal({
   userId,
+  initialPlan = null,
   onClose,
   onSaved,
 }) {
   const [form, setForm] = useState({
-    name: '',
-    start_date: getToday(),
-    end_date: '',
-    notes: '',
+    name: initialPlan?.name || '',
+    start_date: initialPlan?.start_date || getToday(),
+    end_date: initialPlan?.end_date || '',
+    notes: initialPlan?.notes || '',
   })
 
   const [saving, setSaving] =
@@ -448,7 +450,11 @@ function PlanModal({
         <FormActions
           onClose={onClose}
           saving={saving}
-          submitLabel="Create Plan"
+          submitLabel={
+            initialPlan
+              ? 'Save Changes'
+              : 'Create Plan'
+          }
         />
       </form>
     </ModalShell>
@@ -810,9 +816,9 @@ function PlanItemModal({
                   {fmtCurrency(
                     wallet.balance,
                     wallet.currency_code ||
-                      'PHP',
+                    'PHP',
                     wallet.exchange_rate ||
-                      1
+                    1
                   )}
                 </option>
               ))}
@@ -830,9 +836,9 @@ function PlanItemModal({
                   Number(
                     selectedWallet.balance
                   ) >=
-                  Number(
-                    form.estimated_amount
-                  )
+                    Number(
+                      form.estimated_amount
+                    )
                     ? 'var(--text-subtle)'
                     : '#dc2626',
               }}
@@ -844,14 +850,14 @@ function PlanItemModal({
                   Number(
                     selectedWallet.balance
                   ) -
-                    Number(
-                      form.estimated_amount ||
-                        0
-                    ),
+                  Number(
+                    form.estimated_amount ||
+                    0
+                  ),
                   selectedWallet.currency_code ||
-                    'PHP',
+                  'PHP',
                   selectedWallet.exchange_rate ||
-                    1
+                  1
                 )}
               </strong>
             </p>
@@ -930,24 +936,24 @@ function WalletExpenseModal({
       const walletData =
         data || []
 
-        setWallets(walletData)
+      setWallets(walletData)
 
-        if (walletData.length > 0) {
+      if (walletData.length > 0) {
         const plannedWalletExists =
-            walletData.some(
+          walletData.some(
             (wallet) =>
-                String(wallet.id) ===
-                String(defaultWalletId)
-            )
+              String(wallet.id) ===
+              String(defaultWalletId)
+          )
 
         setWalletId(
-            plannedWalletExists
+          plannedWalletExists
             ? String(defaultWalletId)
             : String(walletData[0].id)
         )
-        }
+      }
 
-        setLoadingWallets(false)
+      setLoadingWallets(false)
     }
 
     fetchWallets()
@@ -964,9 +970,9 @@ function WalletExpenseModal({
     return fmtCurrency(
       value,
       selectedWallet?.currency_code ||
-        'PHP',
+      'PHP',
       selectedWallet?.exchange_rate ||
-        1
+      1
     )
   }
 
@@ -1033,7 +1039,7 @@ function WalletExpenseModal({
 
       setError(
         confirmError?.message ||
-          'Failed to process this expense.'
+        'Failed to process this expense.'
       )
     }
 
@@ -1194,9 +1200,9 @@ function WalletExpenseModal({
                   {fmtCurrency(
                     wallet.balance,
                     wallet.currency_code ||
-                      'PHP',
+                    'PHP',
                     wallet.exchange_rate ||
-                      1
+                    1
                   )}
                 </option>
               ))}
@@ -1224,7 +1230,7 @@ function WalletExpenseModal({
                   Number(
                     selectedWallet.balance
                   ) -
-                    Number(amount || 0)
+                  Number(amount || 0)
                 )}
               </strong>
             </p>
@@ -1285,8 +1291,8 @@ function WalletExpenseModal({
                 : 'pointer',
               opacity:
                 saving ||
-                loadingWallets ||
-                wallets.length === 0
+                  loadingWallets ||
+                  wallets.length === 0
                   ? 0.6
                   : 1,
             }}
@@ -1371,24 +1377,24 @@ function ExtraExpenseModal({
       const walletData =
         data || []
 
-        setWallets(walletData)
+      setWallets(walletData)
 
-        if (walletData.length > 0) {
-            const plannedWalletExists =
-                walletData.some(
-                (wallet) =>
-                    String(wallet.id) ===
-                    String(item.wallet_id)
-                )
+      if (walletData.length > 0) {
+        const plannedWalletExists =
+          walletData.some(
+            (wallet) =>
+              String(wallet.id) ===
+              String(item.wallet_id)
+          )
 
-            setWalletId(
-                plannedWalletExists
-                ? String(item.wallet_id)
-                : String(walletData[0].id)
-            )
-        }
+        setWalletId(
+          plannedWalletExists
+            ? String(item.wallet_id)
+            : String(walletData[0].id)
+        )
+      }
 
-        setLoadingWallets(false)
+      setLoadingWallets(false)
     }
 
     fetchWallets()
@@ -1405,9 +1411,9 @@ function ExtraExpenseModal({
     return fmtCurrency(
       value,
       selectedWallet?.currency_code ||
-        'PHP',
+      'PHP',
       selectedWallet?.exchange_rate ||
-        1
+      1
     )
   }
 
@@ -1790,9 +1796,9 @@ function ExtraExpenseModal({
                   {fmtCurrency(
                     wallet.balance,
                     wallet.currency_code ||
-                      'PHP',
+                    'PHP',
                     wallet.exchange_rate ||
-                      1
+                    1
                   )}
                 </option>
               ))}
@@ -1810,9 +1816,9 @@ function ExtraExpenseModal({
                   Number(
                     selectedWallet.balance
                   ) >=
-                  Number(
-                    form.amount
-                  )
+                    Number(
+                      form.amount
+                    )
                     ? 'var(--text-subtle)'
                     : '#dc2626',
               }}
@@ -1823,9 +1829,9 @@ function ExtraExpenseModal({
                   Number(
                     selectedWallet.balance
                   ) -
-                    Number(
-                      form.amount || 0
-                    )
+                  Number(
+                    form.amount || 0
+                  )
                 )}
               </strong>
             </p>
@@ -1909,8 +1915,8 @@ function ExtraExpenseModal({
                 : 'pointer',
               opacity:
                 saving ||
-                loadingWallets ||
-                wallets.length === 0
+                  loadingWallets ||
+                  wallets.length === 0
                   ? 0.6
                   : 1,
             }}
@@ -1986,7 +1992,7 @@ function getScheduledStatus(date) {
 
   const difference = Math.ceil(
     (scheduled - today) /
-      (1000 * 60 * 60 * 24)
+    (1000 * 60 * 60 * 24)
   )
 
   if (difference < 0) {
@@ -2072,11 +2078,11 @@ export default function ExpensePlansSection({
     setLoading(true)
 
     const {
-        data,
-        error,
+      data,
+      error,
     } = await supabase
-        .from('expense_plans')
-        .select(`
+      .from('expense_plans')
+      .select(`
             *,
             expense_plan_items (
             *,
@@ -2089,10 +2095,10 @@ export default function ExpensePlansSection({
             expense_plan_extra_expenses (*)
             )
         `)
-        .eq('user_id', userId)
-        .order('start_date', {
-            ascending: true,
-        })
+      .eq('user_id', userId)
+      .order('start_date', {
+        ascending: true,
+      })
 
     if (error) {
       console.error(
@@ -2112,25 +2118,25 @@ export default function ExpensePlansSection({
 
       items: (
         plan.expense_plan_items || []
-        )
+      )
         .map((item) => ({
-            ...item,
+          ...item,
 
-            plannedWallet:
+          plannedWallet:
             item.wallets || null,
 
-            extraExpenses: (
+          extraExpenses: (
             item.expense_plan_extra_expenses ||
             []
-            ).sort(
+          ).sort(
             (first, second) =>
-                new Date(
+              new Date(
                 first.created_at
-                ) -
-                new Date(
+              ) -
+              new Date(
                 second.created_at
-                )
-            ),
+              )
+          ),
         }))
         .sort((first, second) => {
           if (
@@ -2220,13 +2226,13 @@ export default function ExpensePlansSection({
       previous.map((plan) =>
         plan.id === planId
           ? {
-              ...plan,
-              items:
-                plan.items.filter(
-                  (item) =>
-                    item.id !== itemId
-                ),
-            }
+            ...plan,
+            items:
+              plan.items.filter(
+                (item) =>
+                  item.id !== itemId
+              ),
+          }
           : plan
       )
     )
@@ -2259,20 +2265,20 @@ export default function ExpensePlansSection({
       previous.map((plan) =>
         plan.id === planId
           ? {
-              ...plan,
-              items: [
-                ...(plan.items || []),
-                item,
-              ].sort(
-                (first, second) =>
-                  new Date(
-                    first.scheduled_date
-                  ) -
-                  new Date(
-                    second.scheduled_date
-                  )
-              ),
-            }
+            ...plan,
+            items: [
+              ...(plan.items || []),
+              item,
+            ].sort(
+              (first, second) =>
+                new Date(
+                  first.scheduled_date
+                ) -
+                new Date(
+                  second.scheduled_date
+                )
+            ),
+          }
           : plan
       )
     )
@@ -2287,37 +2293,37 @@ export default function ExpensePlansSection({
     planId,
     updatedItem,
     selectedWallet = null
-    ) {
+  ) {
     setPlans((previous) =>
-        previous.map((plan) =>
+      previous.map((plan) =>
         plan.id === planId
-            ? {
-                ...plan,
+          ? {
+            ...plan,
 
-                items: plan.items.map(
-                (item) =>
-                    item.id ===
-                    updatedItem.id
-                    ? {
-                        ...item,
-                        ...updatedItem,
+            items: plan.items.map(
+              (item) =>
+                item.id ===
+                  updatedItem.id
+                  ? {
+                    ...item,
+                    ...updatedItem,
 
-                        plannedWallet:
-                            selectedWallet ||
-                            item.plannedWallet ||
-                            null,
+                    plannedWallet:
+                      selectedWallet ||
+                      item.plannedWallet ||
+                      null,
 
-                        extraExpenses:
-                            item.extraExpenses ||
-                            [],
-                        }
-                    : item
-                ),
-            }
-            : plan
-        )
+                    extraExpenses:
+                      item.extraExpenses ||
+                      [],
+                  }
+                  : item
+            ),
+          }
+          : plan
+      )
     )
-    }
+  }
 
   function addExtraExpenseToItem(
     planId,
@@ -2328,24 +2334,24 @@ export default function ExpensePlansSection({
       previous.map((plan) =>
         plan.id === planId
           ? {
-              ...plan,
+            ...plan,
 
-              items:
-                plan.items.map(
-                  (item) =>
-                    item.id === itemId
-                      ? {
-                          ...item,
+            items:
+              plan.items.map(
+                (item) =>
+                  item.id === itemId
+                    ? {
+                      ...item,
 
-                          extraExpenses: [
-                            ...(item.extraExpenses ||
-                              []),
-                            extraExpense,
-                          ],
-                        }
-                      : item
-                ),
-            }
+                      extraExpenses: [
+                        ...(item.extraExpenses ||
+                          []),
+                        extraExpense,
+                      ],
+                    }
+                    : item
+              ),
+          }
           : plan
       )
     )
@@ -2452,9 +2458,9 @@ export default function ExpensePlansSection({
     }
 
     updatePlanItem(
-        plan.id,
-        updatedItem,
-        selectedWallet
+      plan.id,
+      updatedItem,
+      selectedWallet
     )
 
     onExpenseCreated?.(expense)
@@ -2506,11 +2512,11 @@ export default function ExpensePlansSection({
           (itemSum, item) =>
             itemSum +
             (item.is_spent ||
-            item.status ===
+              item.status ===
               'confirmed'
               ? Number(
-                  item.actual_amount || 0
-                )
+                item.actual_amount || 0
+              )
               : 0),
           0
         ),
@@ -2707,7 +2713,7 @@ export default function ExpensePlansSection({
                     fontWeight: 800,
                     color:
                       summary.label ===
-                      'Over Budget'
+                        'Over Budget'
                         ? '#dc2626'
                         : 'var(--text)',
                   }}
@@ -2852,7 +2858,7 @@ export default function ExpensePlansSection({
                   sum +
                   Number(
                     item.estimated_amount ||
-                      0
+                    0
                   ),
                 0
               )
@@ -2862,12 +2868,12 @@ export default function ExpensePlansSection({
                 (sum, item) =>
                   sum +
                   (item.is_spent ||
-                  item.status ===
+                    item.status ===
                     'confirmed'
                     ? Number(
-                        item.actual_amount ||
-                          0
-                      )
+                      item.actual_amount ||
+                      0
+                    )
                     : 0),
                 0
               )
@@ -2887,7 +2893,7 @@ export default function ExpensePlansSection({
                       extraSum +
                       Number(
                         extra.amount ||
-                          0
+                        0
                       ),
                     0
                   ),
@@ -3181,7 +3187,7 @@ export default function ExpensePlansSection({
                             fontSize: 12,
                             color:
                               summary.label ===
-                              'Over'
+                                'Over'
                                 ? '#dc2626'
                                 : 'var(--text)',
                           }}
@@ -3270,7 +3276,7 @@ export default function ExpensePlansSection({
                           (item) => {
                             const itemExpanded =
                               expandedItems[
-                                item.id
+                              item.id
                               ]
 
                             const status =
@@ -3291,7 +3297,7 @@ export default function ExpensePlansSection({
                                   sum +
                                   Number(
                                     extra.amount ||
-                                      0
+                                    0
                                   ),
                                 0
                               )
@@ -3326,7 +3332,7 @@ export default function ExpensePlansSection({
                                     disabled={
                                       item.is_spent ||
                                       item.status ===
-                                        'confirmed'
+                                      'confirmed'
                                     }
                                     onClick={() =>
                                       setConfirmingItem(
@@ -3338,7 +3344,7 @@ export default function ExpensePlansSection({
                                     }
                                     title={
                                       item.is_spent ||
-                                      item.status ===
+                                        item.status ===
                                         'confirmed'
                                         ? 'Expense confirmed'
                                         : 'Confirm and deduct'
@@ -3355,22 +3361,21 @@ export default function ExpensePlansSection({
                                         'center',
                                       backgroundColor:
                                         item.is_spent ||
-                                        item.status ===
+                                          item.status ===
                                           'confirmed'
                                           ? '#16a34a'
                                           : 'transparent',
-                                      border: `2px solid ${
-                                        item.is_spent ||
+                                      border: `2px solid ${item.is_spent ||
                                         item.status ===
-                                          'confirmed'
-                                          ? '#16a34a'
-                                          : 'var(--border)'
-                                      }`,
+                                        'confirmed'
+                                        ? '#16a34a'
+                                        : 'var(--border)'
+                                        }`,
                                       borderRadius:
                                         '50%',
                                       cursor:
                                         item.is_spent ||
-                                        item.status ===
+                                          item.status ===
                                           'confirmed'
                                           ? 'default'
                                           : 'pointer',
@@ -3378,12 +3383,12 @@ export default function ExpensePlansSection({
                                   >
                                     {(item.is_spent ||
                                       item.status ===
-                                        'confirmed') && (
-                                      <Check
-                                        size={11}
-                                        color="white"
-                                      />
-                                    )}
+                                      'confirmed') && (
+                                        <Check
+                                          size={11}
+                                          color="white"
+                                        />
+                                      )}
                                   </button>
 
                                   <div
@@ -3434,29 +3439,29 @@ export default function ExpensePlansSection({
 
                                       <span
                                         style={{
-                                            fontSize: 9,
-                                            color: 'var(--border)',
+                                          fontSize: 9,
+                                          color: 'var(--border)',
                                         }}
-                                        >
+                                      >
                                         •
-                                        </span>
+                                      </span>
 
-                                        <span
+                                      <span
                                         style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 3,
-                                            fontSize: 9.5,
-                                            color:
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 3,
+                                          fontSize: 9.5,
+                                          color:
                                             'var(--text-subtle)',
                                         }}
-                                        >
+                                      >
                                         <Wallet size={9} />
 
                                         {item.plannedWallet?.name ||
-                                            item.wallets?.name ||
-                                            'No wallet'}
-                                        </span>
+                                          item.wallets?.name ||
+                                          'No wallet'}
+                                      </span>
 
                                       <span
                                         style={{
@@ -3482,7 +3487,7 @@ export default function ExpensePlansSection({
 
                                       {!item.is_spent &&
                                         item.status !==
-                                          'confirmed' && (
+                                        'confirmed' && (
                                           <span
                                             style={{
                                               padding:
@@ -3524,7 +3529,7 @@ export default function ExpensePlansSection({
                                     >
                                       {fmt(
                                         item.is_spent ||
-                                        item.status ===
+                                          item.status ===
                                           'confirmed'
                                           ? item.actual_amount
                                           : item.estimated_amount
@@ -3538,18 +3543,18 @@ export default function ExpensePlansSection({
                                         fontSize: 9.5,
                                         color:
                                           item.is_spent ||
-                                          item.status ===
+                                            item.status ===
                                             'confirmed'
                                             ? '#16a34a'
                                             : 'var(--text-subtle)',
                                       }}
                                     >
                                       {item.is_spent ||
-                                      item.status ===
+                                        item.status ===
                                         'confirmed'
                                         ? `Actual · Planned ${fmt(
-                                            item.estimated_amount
-                                          )}`
+                                          item.estimated_amount
+                                        )}`
                                         : 'Planned amount'}
                                     </p>
                                   </div>
@@ -3594,7 +3599,7 @@ export default function ExpensePlansSection({
 
                                   {!item.is_spent &&
                                     item.status !==
-                                      'confirmed' && (
+                                    'confirmed' && (
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -3682,7 +3687,7 @@ export default function ExpensePlansSection({
                                             extras.length
                                           }{' '}
                                           {extras.length ===
-                                          1
+                                            1
                                             ? 'expense'
                                             : 'expenses'}{' '}
                                           ·{' '}
@@ -3732,7 +3737,7 @@ export default function ExpensePlansSection({
                                     </div>
 
                                     {extras.length ===
-                                    0 ? (
+                                      0 ? (
                                       <div
                                         style={{
                                           marginTop:
@@ -3955,42 +3960,42 @@ export default function ExpensePlansSection({
 
       {confirmingItem && (
         <WalletExpenseModal
-            title="Confirm Planned Expense"
-            description={`${confirmingItem.plan.name} — ${confirmingItem.item.name}`}
-            defaultAmount={
-                confirmingItem.item
-                .estimated_amount
-            }
-            defaultDate={
-                confirmingItem.item
-                .scheduled_date ||
-                getToday()
-            }
-            defaultWalletId={
-                confirmingItem.item.wallet_id
-            }
-            userId={userId}
-            confirmLabel="Confirm & Deduct"
-            onClose={() =>
-                setConfirmingItem(null)
-            }
-            onConfirm={({
-                amount,
-                expenseDate,
-                walletId,
-                selectedWallet,
-            }) =>
-                confirmMainExpense({
-                plan:
-                    confirmingItem.plan,
-                item:
-                    confirmingItem.item,
-                amount,
-                expenseDate,
-                walletId,
-                selectedWallet,
-                })
-            }
+          title="Confirm Planned Expense"
+          description={`${confirmingItem.plan.name} — ${confirmingItem.item.name}`}
+          defaultAmount={
+            confirmingItem.item
+              .estimated_amount
+          }
+          defaultDate={
+            confirmingItem.item
+              .scheduled_date ||
+            getToday()
+          }
+          defaultWalletId={
+            confirmingItem.item.wallet_id
+          }
+          userId={userId}
+          confirmLabel="Confirm & Deduct"
+          onClose={() =>
+            setConfirmingItem(null)
+          }
+          onConfirm={({
+            amount,
+            expenseDate,
+            walletId,
+            selectedWallet,
+          }) =>
+            confirmMainExpense({
+              plan:
+                confirmingItem.plan,
+              item:
+                confirmingItem.item,
+              amount,
+              expenseDate,
+              walletId,
+              selectedWallet,
+            })
+          }
         />
       )}
 
