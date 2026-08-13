@@ -1092,9 +1092,9 @@ export default function Dashboard({
             <IconButton
               label="Sign out"
               danger
-              onClick={() =>
-                supabase.auth.signOut()
-              }
+              onClick={async () => {
+                await supabase.auth.signOut()
+              }}
             >
               <LogOut size={14} />
             </IconButton>

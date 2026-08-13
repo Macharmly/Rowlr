@@ -5,7 +5,7 @@ import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 
 export default function App() {
-  const [showAuth, setShowAuth] = useState(false)
+  const [showAuth, setShowAuth] = useState(null)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [dark, setDark] = useState(() => localStorage.getItem('rowlr_theme') === 'dark')
@@ -52,6 +52,8 @@ export default function App() {
       <AuthPage
         dark={dark}
         setDark={setDark}
+        initialView={showAuth}
+        onBack={() => setShowAuth(null)}
       />
     )
   }
@@ -60,8 +62,8 @@ export default function App() {
     <LandingPage
       dark={dark}
       setDark={setDark}
-      onGetStarted={() => setShowAuth(true)}
-      onSignIn={() => setShowAuth(true)}
+      onGetStarted={() => setShowAuth('signup')}
+      onSignIn={() => setShowAuth('login')}
     />
   )
 }
