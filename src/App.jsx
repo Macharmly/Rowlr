@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
+import LandingPage from './pages/LandingPage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 
 export default function App() {
+  const [showAuth, setShowAuth] = useState(false)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [dark, setDark] = useState(() => localStorage.getItem('rowlr_theme') === 'dark')
@@ -35,7 +37,31 @@ export default function App() {
     )
   }
 
-  return user
-    ? <Dashboard user={user} dark={dark} setDark={setDark} />
-    : <AuthPage dark={dark} setDark={setDark} />
+  if (user) {
+    return (
+      <Dashboard
+        user={user}
+        dark={dark}
+        setDark={setDark}
+      />
+    )
+  }
+
+  if (showAuth) {
+    return (
+      <AuthPage
+        dark={dark}
+        setDark={setDark}
+      />
+    )
+  }
+
+  return (
+    <LandingPage
+      dark={dark}
+      setDark={setDark}
+      onGetStarted={() => setShowAuth(true)}
+      onSignIn={() => setShowAuth(true)}
+    />
+  )
 }
