@@ -1,74 +1,141 @@
 import { useState, useEffect } from 'react'
 import ConfirmDialog from './ConfirmDialog'
-import { Plus, Trash2, Receipt, Loader2, X, Check, Clock } from 'lucide-react'
+import { Plus, Trash2, Receipt, Loader2, X, Check, Clock, Edit2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { fmt as fmtCurrency } from '../lib/currency'
 
 const BILL_CATEGORIES = ['Rent', 'Electricity', 'Water', 'Internet', 'Phone', 'Insurance', 'Subscription', 'Loan', 'Credit Card', 'Other']
 
-function BillModal({ userId, onClose, onSaved }) {
-  const [form, setForm] = useState({ name: '', amount: '', due_date: '', category: 'Other', notes: '' })
+function BillModal({ userId, bill, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name: bill?.name || '',
+    amount: bill?.amount?.toString() || '',
+    due_date: bill?.due_date || '',
+    category: bill?.category || 'Other',
+    notes: bill?.notes || '',
+  })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const editing = !!bill
+
+  const update = (key, value) => setForm(p => ({ ...p, [key]: value }))
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name.trim()) { setError('Bill name is required.'); return }
-    if (!form.amount || isNaN(form.amount) || parseFloat(form.amount) <= 0) { setError('Please enter a valid amount.'); return }
-    if (!form.due_date) { setError('Due date is required.'); return }
-    setSaving(true); setError(null)
-    const { data, error } = await supabase.from('bills').insert([{
-      user_id: userId, name: form.name.trim(), amount: parseFloat(form.amount),
-      due_date: form.due_date, category: form.category,
-      notes: form.notes.trim() || null, is_paid: false,
-    }]).select().single()
-    if (error) setError('Failed to save bill.')
-    else { onSaved(data); onClose() }
+
+    if (!form.name.trim()) return setError('Bill name is required.')
+    if (!form.amount || isNaN(form.amount) || parseFloat(form.amount) <= 0)
+      return setError('Please enter a valid amount.')
+    if (!form.due_date) return setError('Due date is required.')
+
+    setSaving(true)
+    setError(null)
+
+    const values = {
+      name: form.name.trim(),
+      amount: parseFloat(form.amount),
+      due_date: form.due_date,
+      category: form.category,
+      notes: form.notes.trim() || null,
+    }
+
+    const query = editing
+      ? supabase.from('bills').update(values).eq('id', bill.id)
+      : supabase.from('bills').insert([{ ...values, user_id: userId, is_paid: false }])
+
+    const { data, error } = await query.select().single()
+
+    if (error) setError(`Failed to ${editing ? 'update' : 'save'} bill.`)
+    else {
+      onSaved(data)
+      onClose()
+    }
+
     setSaving(false)
   }
 
   const s = {
-    input: { width: '100%', padding: '10px 14px', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 13, color: 'var(--text)', outline: 'none' },
-    label: { display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' },
+    input: {
+      width: '100%',
+      padding: '10px 14px',
+      backgroundColor: 'var(--input-bg)',
+      border: '1px solid var(--border)',
+      borderRadius: 12,
+      fontSize: 13,
+      color: 'var(--text)',
+      outline: 'none',
+    },
+    label: {
+      display: 'block',
+      fontSize: 11,
+      fontWeight: 500,
+      color: 'var(--text-muted)',
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+    },
   }
 
   return (
     <div className="animate-overlay-in" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="animate-modal-in" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 20, width: '100%', maxWidth: 420, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
+        
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <h2 style={{ fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Add Bill</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={16} /></button>
+          <h2 style={{ fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+            {editing ? 'Edit Bill' : 'Add Bill'}
+          </h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+            <X size={16} />
+          </button>
         </div>
+
         <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={s.label}>Bill Name *</label>
-            <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Meralco Bill" style={s.input} />
+            <input value={form.name} onChange={e => update('name', e.target.value)} placeholder="e.g. Meralco Bill" style={s.input} />
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={s.label}>Amount (₱) *</label>
-              <input type="number" step="0.01" min="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="0.00" style={s.input} />
+              <input type="number" step="0.01" min="0" value={form.amount} onChange={e => update('amount', e.target.value)} placeholder="0.00" style={s.input} />
             </div>
+
             <div>
               <label style={s.label}>Due Date *</label>
-              <input type="date" value={form.due_date} onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))} style={s.input} />
+              <input type="date" value={form.due_date} onChange={e => update('due_date', e.target.value)} style={s.input} />
             </div>
           </div>
+
           <div>
             <label style={s.label}>Category</label>
-            <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} style={s.input}>
+            <select value={form.category} onChange={e => update('category', e.target.value)} style={s.input}>
               {BILL_CATEGORIES.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
+
           <div>
             <label style={s.label}>Notes</label>
-            <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="e.g. March electricity" style={s.input} />
+            <input value={form.notes} onChange={e => update('notes', e.target.value)} placeholder="e.g. March electricity" style={s.input} />
           </div>
-          {error && <p style={{ fontSize: 12, color: '#ef4444', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '8px 12px', margin: 0 }}>{error}</p>}
+
+          {error && (
+            <p style={{ fontSize: 12, color: '#ef4444', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '8px 12px', margin: 0 }}>
+              {error}
+            </p>
+          )}
+
           <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" onClick={onClose} style={{ flex: 1, padding: '10px 0', backgroundColor: 'transparent', border: '1px solid var(--border)', borderRadius: 12, fontSize: 13, fontWeight: 500, color: 'var(--text-muted)', cursor: 'pointer' }}>Cancel</button>
+            <button type="button" onClick={onClose} style={{ flex: 1, padding: '10px 0', backgroundColor: 'transparent', border: '1px solid var(--border)', borderRadius: 12, fontSize: 13, fontWeight: 500, color: 'var(--text-muted)', cursor: 'pointer' }}>
+              Cancel
+            </button>
+
             <button type="submit" disabled={saving} style={{ flex: 1, padding: '10px 0', backgroundColor: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              {saving ? <><Loader2 size={13} className="animate-spin" /> Saving...</> : 'Add Bill'}
+              {saving ? (
+                <><Loader2 size={13} className="animate-spin" /> Saving...</>
+              ) : (
+                editing ? 'Save Changes' : 'Add Bill'
+              )}
             </button>
           </div>
         </form>
@@ -203,6 +270,7 @@ export default function BillsSection({ userId, currency = 'PHP', rate = 1 }) {
   const [bills, setBills] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingBill, setEditingBill] = useState(null)
   const [payingBill, setPayingBill] = useState(null)
   const [filter, setFilter] = useState('Unpaid')
   const [confirmDelete, setConfirmDelete] = useState(null)
@@ -334,13 +402,26 @@ export default function BillsSection({ userId, currency = 'PHP', rate = 1 }) {
                     </span>
                   </div>
 
-                  {/* Delete */}
-                  <button onClick={() => setConfirmDelete(bill)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', display: 'flex', padding: 3, flexShrink: 0 }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                    onMouseLeave={e => e.currentTarget.style.color = '#fca5a5'}
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  {/* Edit + Delete */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                    <button
+                      onClick={() => setEditingBill(bill)}
+                      title="Edit bill"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex', padding: 4 }}
+                    >
+                      <Edit2 size={12} />
+                    </button>
+
+                    <button
+                      onClick={() => setConfirmDelete(bill)}
+                      title="Delete bill"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', display: 'flex', padding: 4 }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                      onMouseLeave={e => e.currentTarget.style.color = '#fca5a5'}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
               )
             })}
@@ -348,8 +429,23 @@ export default function BillsSection({ userId, currency = 'PHP', rate = 1 }) {
         )}
       </div>
 
-      {showAddModal && (
-        <BillModal userId={userId} onClose={() => setShowAddModal(false)} onSaved={bill => setBills(prev => [...prev, bill].sort((a, b) => new Date(a.due_date) - new Date(b.due_date)))} />
+      {(showAddModal || editingBill) && (
+        <BillModal
+          userId={userId}
+          bill={editingBill}
+          onClose={() => {
+            setShowAddModal(false)
+            setEditingBill(null)
+          }}
+          onSaved={bill => {
+            setBills(prev =>
+              (editingBill
+                ? prev.map(b => b.id === bill.id ? bill : b)
+                : [...prev, bill]
+              ).sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
+            )
+          }}
+        />
       )}
 
       {confirmDelete && (
