@@ -25,31 +25,34 @@ export default function FinancialScore({ expenses, income, wallets, bills, loans
 
   async function generateScore() {
     setLoading(true)
+
     try {
       const now = new Date()
       const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
       const monthExpenses = expenses.filter(e => e.date.startsWith(monthStr))
-      const totalExpenses = monthExpenses.reduce((s, e) => s + parseFloat(e.amount), 0)
-      const totalIncome = income.reduce((s, i) => s + parseFloat(i.amount), 0)
-      const totalWallets = wallets.reduce((s, w) => s + parseFloat(w.balance), 0)
-      const totalUnpaidBills = bills.filter(b => !b.is_paid).reduce((s, b) => s + parseFloat(b.amount), 0)
-      const totalLentOut = loans.filter(l => l.status !== 'returned').reduce((s, l) => s + parseFloat(l.principal_amount), 0)
-      const totalSaved = savings.reduce((s, g) => s + parseFloat(g.current_amount), 0)
+      const totalExpenses = monthExpenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+      const totalIncome = income.reduce((s, i) => s + parseFloat(i.amount || 0), 0)
+      const totalWallets = wallets.reduce((s, w) => s + parseFloat(w.balance || 0), 0)
+      const totalUnpaidBills = bills.filter(b => !b.is_paid).reduce((s, b) => s + parseFloat(b.amount || 0), 0)
+      const totalLentOut = loans.filter(l => l.status !== 'returned').reduce((s, l) => s + parseFloat(l.principal_amount || 0), 0)
+      const totalSaved = savings.reduce((s, g) => s + parseFloat(g.current_amount || 0), 0)
 
       const catBreakdown = monthExpenses.reduce((acc, e) => {
-        acc[e.category] = (acc[e.category] || 0) + parseFloat(e.amount)
+        acc[e.category] = (acc[e.category] || 0) + parseFloat(e.amount || 0)
         return acc
       }, {})
 
       const summary = `
-Monthly Expenses: ₱${totalExpenses.toFixed(2)}
-Monthly Income: ₱${totalIncome.toFixed(2)}
-Total Wallet Balance: ₱${totalWallets.toFixed(2)}
-Unpaid Bills: ₱${totalUnpaidBills.toFixed(2)}
-Money Lent Out: ₱${totalLentOut.toFixed(2)}
-Total Savings: ₱${totalSaved.toFixed(2)}
-Expense Breakdown: ${Object.entries(catBreakdown).map(([k, v]) => `${k}: ₱${v.toFixed(2)}`).join(', ')}
+  Monthly Expenses: ₱${totalExpenses.toFixed(2)}
+  Monthly Income: ₱${totalIncome.toFixed(2)}
+  Total Wallet Balance: ₱${totalWallets.toFixed(2)}
+  Unpaid Bills: ₱${totalUnpaidBills.toFixed(2)}
+  Money Lent Out: ₱${totalLentOut.toFixed(2)}
+  Total Savings: ₱${totalSaved.toFixed(2)}
+  Expense Breakdown: ${Object.entries(catBreakdown)
+        .map(([k, v]) => `${k}: ₱${v.toFixed(2)}`)
+        .join(', ')}
       `.trim()
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -60,42 +63,86 @@ Expense Breakdown: ${Object.entries(catBreakdown).map(([k, v]) => `${k}: ₱${v.
         },
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
-          max_tokens: 600,
+          max_completion_tokens: 600,
+          temperature: 0.3,
+          response_format: {
+            type: 'json_object',
+          },
           messages: [{
+            role: 'system',
+            content: 'You are a personal finance advisor. Always return valid JSON only.'
+          }, {
             role: 'user',
-            content: `You are a personal finance advisor. Analyze this financial data and give a score.
+            content: `Analyze this financial data and give a financial score.
 
-${summary}
+  ${summary}
 
-Return ONLY a valid JSON object, no markdown, no backticks:
-{
-  "score": 72,
-  "label": "Good",
-  "summary": "One sentence overall assessment.",
-  "positives": ["thing 1", "thing 2"],
-  "improvements": ["thing 1", "thing 2"],
-  "tips": ["actionable tip 1", "actionable tip 2"]
-}
+  Return ONLY this JSON structure:
+  {
+    "score": 72,
+    "label": "Good",
+    "summary": "One sentence overall assessment.",
+    "positives": ["thing 1", "thing 2"],
+    "improvements": ["thing 1", "thing 2"],
+    "tips": ["actionable tip 1", "actionable tip 2"]
+  }
 
-Rules:
-- score: 0-100 integer
-- positives: 2-3 things they're doing well
-- improvements: 2-3 areas to improve
-- tips: 2-3 specific actionable tips
-- Keep all text short and friendly`
+  Rules:
+  - score must be an integer from 0 to 100
+  - label must be Excellent, Good, Fair, or Poor
+  - positives must contain 2-3 short points
+  - improvements must contain 2-3 short points
+  - tips must contain 2-3 specific actionable tips
+  - Keep everything short and friendly`
           }]
         })
       })
 
-      const data = await response.json()
-      const text = data.choices?.[0]?.message?.content?.trim() || ''
-      const clean = text.replace(/```json|```/g, '').trim()
-      setResult(JSON.parse(clean))
+      const raw = await response.text()
+
+      if (!response.ok) {
+        console.error('Groq API error:', response.status, raw)
+        throw new Error(`Groq API returned ${response.status}`)
+      }
+
+      if (!raw.trim()) {
+        throw new Error('Groq returned an empty response')
+      }
+
+      const data = JSON.parse(raw)
+      const content = data.choices?.[0]?.message?.content?.trim()
+
+      if (!content) {
+        console.error('Unexpected Groq response:', data)
+        throw new Error('Groq returned no content')
+      }
+
+      const clean = content.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
+
+      setResult({
+        score: Math.max(0, Math.min(100, parseInt(parsed.score) || 0)),
+        label: parsed.label || 'Fair',
+        summary: parsed.summary || 'No summary available.',
+        positives: Array.isArray(parsed.positives) ? parsed.positives : [],
+        improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
+        tips: Array.isArray(parsed.tips) ? parsed.tips : [],
+      })
+
     } catch (err) {
       console.error('Score generation failed:', err)
-      setResult({ score: 0, label: 'Error', summary: 'Failed to generate score. Please try again.', positives: [], improvements: [], tips: [] })
+
+      setResult({
+        score: 0,
+        label: 'Error',
+        summary: 'Failed to generate score. Please try again.',
+        positives: [],
+        improvements: [],
+        tips: [],
+      })
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const scoreStyle = result ? getScoreStyle(result.score) : null

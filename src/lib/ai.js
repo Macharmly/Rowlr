@@ -12,32 +12,61 @@ export async function getSpendingInsights(expenses) {
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
-        max_tokens: 300,
-        messages: [
-          {
-            role: 'user',
-            content: `You are a personal finance assistant. Analyze these recent expenses and give 2-3 short, friendly, actionable insights. Be concise and specific. Use Philippine Peso (₱).
+        max_tokens: 500,
+        temperature: 0.4,
+        messages: [{
+          role: 'user',
+          content: `You are a personal finance assistant.
+
+Analyze these recent expenses and provide 2-3 short, friendly, actionable insights.
 
 Expenses:
 ${summary}
 
-Return ONLY a JSON array of insight objects, no markdown, no backticks:
-[
-  {"type": "warning", "message": "Your food spending is high this week."},
-  {"type": "tip", "message": "Consider meal prepping to save money."},
-  {"type": "positive", "message": "Great job keeping transport costs low!"}
-]
+Return ONLY valid JSON in this exact format:
+{
+  "insights": [
+    {
+      "type": "warning",
+      "message": "Your food spending is high this week."
+    }
+  ]
+}
 
-type must be one of: warning, tip, positive`,
-          },
-        ],
+The "type" must be exactly one of:
+warning
+tip
+positive
+
+Do not include markdown or code fences.`
+        }],
+        response_format: {
+          type: 'json_object'
+        },
       }),
     })
 
-    const data = await response.json()
-    const text = data.choices?.[0]?.message?.content?.trim() || '[]'
-    const clean = text.replace(/```json|```/g, '').trim()
-    return JSON.parse(clean)
+    const raw = await response.text()
+
+    if (!response.ok) {
+      console.error('Groq API error:', response.status, raw)
+      throw new Error(`Groq API returned ${response.status}`)
+    }
+
+    if (!raw.trim()) {
+      throw new Error('Groq returned an empty response')
+    }
+
+    const data = JSON.parse(raw)
+    const content = data.choices?.[0]?.message?.content
+
+    if (!content) {
+      throw new Error('Groq returned no message content')
+    }
+
+    const result = JSON.parse(content)
+
+    return Array.isArray(result.insights) ? result.insights : []
   } catch (err) {
     console.error('AI insights failed:', err)
     return []
