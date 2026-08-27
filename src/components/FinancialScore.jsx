@@ -62,7 +62,7 @@ export default function FinancialScore({ expenses, income, wallets, bills, loans
           'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           max_completion_tokens: 600,
           temperature: 0.3,
           response_format: {
@@ -75,25 +75,25 @@ export default function FinancialScore({ expenses, income, wallets, bills, loans
             role: 'user',
             content: `Analyze this financial data and give a financial score.
 
-  ${summary}
+        ${summary}
 
-  Return ONLY this JSON structure:
-  {
-    "score": 72,
-    "label": "Good",
-    "summary": "One sentence overall assessment.",
-    "positives": ["thing 1", "thing 2"],
-    "improvements": ["thing 1", "thing 2"],
-    "tips": ["actionable tip 1", "actionable tip 2"]
-  }
+        Return ONLY this JSON structure:
+        {
+          "score": 72,
+          "label": "Good",
+          "summary": "One sentence overall assessment.",
+          "positives": ["thing 1", "thing 2"],
+          "improvements": ["thing 1", "thing 2"],
+          "tips": ["actionable tip 1", "actionable tip 2"]
+        }
 
-  Rules:
-  - score must be an integer from 0 to 100
-  - label must be Excellent, Good, Fair, or Poor
-  - positives must contain 2-3 short points
-  - improvements must contain 2-3 short points
-  - tips must contain 2-3 specific actionable tips
-  - Keep everything short and friendly`
+        Rules:
+        - score must be an integer from 0 to 100
+        - label must be Excellent, Good, Fair, or Poor
+        - positives must contain 2-3 short points
+        - improvements must contain 2-3 short points
+        - tips must contain 2-3 specific actionable tips
+        - Keep everything short and friendly`
           }]
         })
       })
