@@ -85,6 +85,7 @@ export default function Dashboard({user,dark,setDark}){
   useEffect(()=>{fetchProfile();fetchBudgets()},[user.id])
   useEffect(()=>{getExchangeRates().then(setRates)},[])
   useEffect(()=>localStorage.setItem('rowlr_active_tab',activeTab),[activeTab])
+  useEffect(()=>{if(activeTab==='Score')fetchScoreData()},[activeTab,user.id])
 
   async function fetchScoreData(){
     const tables=['wallets','income','bills','loans','savings_goals']
@@ -130,7 +131,7 @@ export default function Dashboard({user,dark,setDark}){
 
   const handleDelete=id=>setExpenses(p=>p.filter(e=>e.id!==id))
   const handleUpdated=e=>setExpenses(p=>p.map(x=>x.id===e.id?e:x))
-  const handleTabChange=tab=>{setActiveTab(tab);if(tab==='Score')fetchScoreData()}
+  const handleTabChange=tab=>setActiveTab(tab)
   const clearFilters=()=>{setSearch('');setCategoryFilter('All')}
 
   const currency=profile?.currency||'PHP'

@@ -63,7 +63,7 @@ export default function FinancialScore({ expenses, income, wallets, bills, loans
         },
         body: JSON.stringify({
           model: 'openai/gpt-oss-120b',
-          max_completion_tokens: 600,
+          max_completion_tokens: 1000,
           temperature: 0.3,
           response_format: {
             type: 'json_object',
