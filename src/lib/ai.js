@@ -12,37 +12,48 @@ export async function getSpendingInsights(expenses) {
       },
       body: JSON.stringify({
         model: 'openai/gpt-oss-120b',
-        max_tokens: 500,
-        temperature: 0.4,
+        max_completion_tokens: 500,
+        temperature: 0.3,
+        response_format: {
+          type: 'json_object',
+        },
         messages: [{
+          role: 'system',
+          content: 'You are a personal finance assistant. Always return valid JSON.'
+        }, {
           role: 'user',
-          content: `You are a personal finance assistant.
-
-Analyze these recent expenses and provide 2-3 short, friendly, actionable insights.
+          content: `Analyze these recent expenses and provide 2-3 short, friendly, actionable insights.
 
 Expenses:
 ${summary}
 
-Return ONLY valid JSON in this exact format:
+Return ONLY a valid JSON object using exactly this structure:
 {
   "insights": [
     {
       "type": "warning",
       "message": "Your food spending is high this week."
+    },
+    {
+      "type": "tip",
+      "message": "Consider meal prepping to reduce food expenses."
+    },
+    {
+      "type": "positive",
+      "message": "Great job keeping transport costs low!"
     }
   ]
 }
 
-The "type" must be exactly one of:
-warning
-tip
-positive
-
-Do not include markdown or code fences.`
-        }],
-        response_format: {
-          type: 'json_object'
-        },
+Rules:
+- "insights" must be an array
+- Provide 2-3 insights
+- "type" must be exactly "warning", "tip", or "positive"
+- "message" must be a short, friendly sentence
+- Use Philippine Peso (₱) when mentioning money
+- Return JSON only
+- Do not use markdown or code fences`
+        }]
       }),
     })
 
@@ -58,15 +69,25 @@ Do not include markdown or code fences.`
     }
 
     const data = JSON.parse(raw)
-    const content = data.choices?.[0]?.message?.content
+    const content = data.choices?.[0]?.message?.content?.trim()
 
     if (!content) {
-      throw new Error('Groq returned no message content')
+      console.error('Unexpected Groq response:', data)
+      throw new Error('Groq returned no content')
     }
 
     const result = JSON.parse(content)
 
-    return Array.isArray(result.insights) ? result.insights : []
+    if (!Array.isArray(result.insights)) {
+      throw new Error('Invalid insights format')
+    }
+
+    return result.insights.filter(
+      insight =>
+        ['warning', 'tip', 'positive'].includes(insight.type) &&
+        typeof insight.message === 'string'
+    )
+
   } catch (err) {
     console.error('AI insights failed:', err)
     return []
