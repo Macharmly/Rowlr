@@ -23,6 +23,7 @@ import SavingsGoals from '../components/SavingsGoals'
 import FinancialNotes from '../components/FinancialNotes'
 import NetWorth from '../components/NetWorth'
 import ExpensePlansSection from '../components/ExpensePlansSection'
+import AIChatbot from '../components/AIChatbot'
 
 const CATEGORIES=['All','Food','Transport','Shopping','Bills','Health','Entertainment','Education','Savings','Other']
 const TABS=['Expenses','Analytics','Budgets','Wallets & Income','Bills','Expense Plans','Loans','Savings','Net Worth','Notes','Calendar','Score']
@@ -63,6 +64,7 @@ export default function Dashboard({user,dark,setDark}){
   const [expenses,setExpenses]=useState([])
   const [loading,setLoading]=useState(true)
   const [showModal,setShowModal]=useState(false)
+  const [highlightedTab, setHighlightedTab] = useState(null)
   const [showProfile,setShowProfile]=useState(false)
   const [categoryFilter,setCategoryFilter]=useState('All')
   const [dateFilter,setDateFilter]=useState('this_month')
@@ -131,7 +133,15 @@ export default function Dashboard({user,dark,setDark}){
 
   const handleDelete=id=>setExpenses(p=>p.filter(e=>e.id!==id))
   const handleUpdated=e=>setExpenses(p=>p.map(x=>x.id===e.id?e:x))
-  const handleTabChange=tab=>setActiveTab(tab)
+  const handleTabChange = tab => {
+    setActiveTab(tab)
+
+    setHighlightedTab(tab)
+
+    setTimeout(() => {
+      setHighlightedTab(null)
+    }, 2200)
+  }
   const clearFilters=()=>{setSearch('');setCategoryFilter('All')}
 
   const currency=profile?.currency||'PHP'
@@ -214,7 +224,40 @@ export default function Dashboard({user,dark,setDark}){
           </select>
           <ChevronDown size={15} style={{position:'absolute',top:'50%',right:14,transform:'translateY(-50%)',pointerEvents:'none'}}/>
         </div>:<div style={{display:'flex',gap:3,padding:4,overflowX:'auto',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:15}}>
-          {TABS.map(tab=>{const active=activeTab===tab;return <button type="button" key={tab} onClick={()=>handleTabChange(tab)} style={{minHeight:34,flexShrink:0,padding:'7px 13px',background:active?'var(--card)':'transparent',border:active?'1px solid var(--border)':'1px solid transparent',borderRadius:11,color:active?'var(--text)':'var(--text-muted)',fontSize:11.5,fontWeight:active?700:550,cursor:'pointer'}}>{tab}</button>})}
+          {TABS.map(tab=>{
+            const active=activeTab===tab
+            const highlighted=highlightedTab===tab
+
+            return <button
+              type="button"
+              key={tab}
+              onClick={()=>handleTabChange(tab)}
+              style={{
+                minHeight:34,
+                flexShrink:0,
+                padding:'7px 13px',
+                background:active?'var(--card)':'transparent',
+                border:active?'1px solid var(--border)':'1px solid transparent',
+                borderRadius:11,
+                color:active?'var(--text)':'var(--text-muted)',
+                fontSize:11.5,
+                fontWeight:active?700:550,
+                cursor:'pointer',
+
+                boxShadow: highlighted
+                  ? '0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent), 0 0 22px color-mix(in srgb,var(--accent) 35%,transparent)'
+                  : 'none',
+
+                transform: highlighted
+                  ? 'translateY(-2px) scale(1.03)'
+                  : 'none',
+
+                transition:'all .25s'
+              }}
+            >
+              {tab}
+            </button>
+          })}
         </div>}
       </section>
 
@@ -302,5 +345,14 @@ export default function Dashboard({user,dark,setDark}){
     {showModal&&<AddExpenseModal onClose={()=>setShowModal(false)} onSaved={e=>setExpenses(p=>[e,...p])} userId={user.id} currency={currency} rate={rate}/>}
 
     {showProfile&&<ProfileModal user={user} onClose={()=>setShowProfile(false)} onSaved={data=>{setProfile(data);forceRefreshRates();getExchangeRates().then(setRates)}}/>}
+    
+    <AIChatbot
+      userId={user.id}
+      expenses={expenses}
+      currency={currency}
+      profile={profile}
+      onNavigate={handleTabChange}
+      onAddExpense={() => setShowModal(true)}
+    />
   </div>
 }
