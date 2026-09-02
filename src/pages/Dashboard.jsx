@@ -206,7 +206,7 @@ export default function Dashboard({user,dark,setDark}){
   const isMobile=windowWidth<640
   const isCompact=windowWidth<900
 
-  useEffect(()=>fetchExpenses(),[dateFilter,user.id])
+  useEffect(()=>fetchExpenses(),[user.id])
   useEffect(()=>{
     fetchProfile()
     fetchBudgets()
@@ -266,34 +266,12 @@ export default function Dashboard({user,dark,setDark}){
   async function fetchExpenses(){
     setLoading(true)
 
-    let query=supabase
+    const {data,error}=await supabase
       .from('expenses')
       .select('*')
       .eq('user_id',user.id)
       .order('date',{ascending:false})
       .order('created_at',{ascending:false})
-
-    const now=new Date()
-
-    if(dateFilter==='this_week'){
-      const start=new Date(now)
-      start.setDate(now.getDate()-now.getDay())
-      query=query.gte('date',start.toISOString().split('T')[0])
-    }else if(dateFilter==='this_month'){
-      query=query.gte(
-        'date',
-        `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`
-      )
-    }else if(dateFilter==='last_month'){
-      const start=new Date(now.getFullYear(),now.getMonth()-1,1)
-      const end=new Date(now.getFullYear(),now.getMonth(),0)
-
-      query=query
-        .gte('date',start.toISOString().split('T')[0])
-        .lte('date',end.toISOString().split('T')[0])
-    }
-
-    const {data,error}=await query
 
     if(error){
       console.error('Error fetching expenses:',error)
@@ -326,11 +304,57 @@ export default function Dashboard({user,dark,setDark}){
   const rate=getRate(rates,currency)
   const fmt=amount=>fmtCurrency(amount,currency,rate)
 
-  const filtered=expenses
+  const now=new Date()
+  const today=new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  )
+
+  const filtered=[...expenses]
+    .filter(e=>{
+      if(dateFilter==='all')return true
+
+      const expenseDate=new Date(`${e.date}T00:00:00`)
+
+      if(dateFilter==='this_week'){
+        const start=new Date(today)
+        start.setDate(today.getDate()-today.getDay())
+
+        return expenseDate>=start
+      }
+
+      if(dateFilter==='this_month'){
+        return (
+          expenseDate.getFullYear()===today.getFullYear() &&
+          expenseDate.getMonth()===today.getMonth()
+        )
+      }
+
+      if(dateFilter==='last_month'){
+        const start=new Date(
+          today.getFullYear(),
+          today.getMonth()-1,
+          1
+        )
+
+        const end=new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          0
+        )
+
+        return expenseDate>=start&&expenseDate<=end
+      }
+
+      return true
+    })
     .filter(e=>categoryFilter==='All'||e.category===categoryFilter)
     .filter(e=>{
       if(!search.trim())return true
+
       const q=search.toLowerCase()
+
       return (
         (e.notes||'').toLowerCase().includes(q)||
         (e.category||'').toLowerCase().includes(q)||
@@ -339,12 +363,13 @@ export default function Dashboard({user,dark,setDark}){
     })
     .sort((a,b)=>{
       let x,y
+
       if(sortBy==='date'){
-        x=a.date
-        y=b.date
+        x=a.date||''
+        y=b.date||''
       }else if(sortBy==='amount'){
-        x=Number(a.amount)
-        y=Number(b.amount)
+        x=Number(a.amount)||0
+        y=Number(b.amount)||0
       }else{
         x=a.category||''
         y=b.category||''
@@ -358,9 +383,10 @@ export default function Dashboard({user,dark,setDark}){
     })
 
   const total=filtered.reduce((s,e)=>s+Number(e.amount),0)
-  const today=new Date().toISOString().split('T')[0]
+  const todayString=today.toISOString().split('T')[0]
+
   const todayTotal=expenses
-    .filter(e=>e.date===today)
+    .filter(e=>e.date===todayString)
     .reduce((s,e)=>s+Number(e.amount),0)
 
   const categoryTotals=expenses.reduce((a,e)=>{
