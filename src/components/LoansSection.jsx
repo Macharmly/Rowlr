@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import ConfirmDialog from './ConfirmDialog'
-import { Plus, Trash2, Loader2, X, Check, Users, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, Loader2, X, Check, Users, Calendar, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { fmt as fmtCurrency } from '../lib/currency'
 
@@ -161,12 +161,16 @@ function AddPaymentModal({ loan, userId, totalPaid, onClose, onPaymentAdded }) {
 }
 
 // Add Loan Modal
-function AddLoanModal({ userId, onClose, onSaved }) {
+function AddLoanModal({ userId, initialLoan = null, onClose, onSaved }) {
   const [wallets, setWallets] = useState([])
   const [form, setForm] = useState({
-    borrower_name: '', principal_amount: '', return_amount: '',
-    wallet_id: '', date_lent: new Date().toISOString().split('T')[0],
-    due_date: '', notes: '',
+    borrower_name: initialLoan?.borrower_name || '',
+    principal_amount: initialLoan?.principal_amount || '',
+    return_amount: initialLoan?.return_amount || '',
+    wallet_id: initialLoan?.wallet_id || '',
+    date_lent: initialLoan?.date_lent || new Date().toISOString().split('T')[0],
+    due_date: initialLoan?.due_date || '',
+    notes: initialLoan?.notes || '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -175,10 +179,10 @@ function AddLoanModal({ userId, onClose, onSaved }) {
     async function fetchWallets() {
       const { data } = await supabase.from('wallets').select('*').eq('user_id', userId).order('created_at', { ascending: true })
       setWallets(data || [])
-      if (data && data.length > 0) setForm(p => ({ ...p, wallet_id: data[0].id }))
+      if (data && data.length > 0 && !initialLoan?.wallet_id) setForm(p => ({ ...p, wallet_id: data[0].id }))
     }
     fetchWallets()
-  }, [userId])
+  }, [userId, initialLoan?.wallet_id])
 
   function handleChange(e) { setForm(p => ({ ...p, [e.target.name]: e.target.value })) }
 
@@ -186,7 +190,7 @@ function AddLoanModal({ userId, onClose, onSaved }) {
   const principal = parseFloat(form.principal_amount) || 0
   const returnAmt = parseFloat(form.return_amount) || 0
   const revenue = returnAmt - principal
-  const selectedWallet = wallets.find(w => w.id === form.wallet_id)
+  const selectedWallet = wallets.find(w => String(w.id) === String(form.wallet_id))
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -194,21 +198,36 @@ function AddLoanModal({ userId, onClose, onSaved }) {
     if (!form.principal_amount || principal <= 0) { setError('Please enter a valid amount.'); return }
     if (!form.return_amount || returnAmt <= 0) { setError('Please enter the return amount.'); return }
     if (returnAmt < principal) { setError('Return amount cannot be less than the borrowed amount.'); return }
-    if (form.wallet_id && selectedWallet && parseFloat(selectedWallet.balance) < principal) {
+    const originalWallet = wallets.find(w => String(w.id) === String(initialLoan?.wallet_id))
+    const originalPrincipal = parseFloat(initialLoan?.principal_amount) || 0
+    const availableBalance = initialLoan && String(initialLoan.wallet_id) === String(form.wallet_id)
+      ? parseFloat(selectedWallet?.balance || 0) + originalPrincipal
+      : parseFloat(selectedWallet?.balance || 0)
+    if (form.wallet_id && selectedWallet && availableBalance < principal) {
       setError(`Insufficient balance in ${selectedWallet.name}. Available: ${fmt(selectedWallet.balance)}`); return
     }
     setSaving(true); setError(null)
     try {
-      const { data, error: loanError } = await supabase.from('loans').insert([{
-        user_id: userId, borrower_name: form.borrower_name.trim(),
+      const loanData = {
+        borrower_name: form.borrower_name.trim(),
         principal_amount: principal, return_amount: returnAmt,
         wallet_id: form.wallet_id || null, date_lent: form.date_lent,
-        due_date: form.due_date || null, notes: form.notes.trim() || null, status: 'active',
-      }]).select().single()
+        due_date: form.due_date || null, notes: form.notes.trim() || null,
+      }
+      const request = initialLoan
+        ? supabase.from('loans').update(loanData).eq('id', initialLoan.id).eq('user_id', userId)
+        : supabase.from('loans').insert([{ ...loanData, user_id: userId, status: 'active' }])
+      const { data, error: loanError } = await request.select().single()
       if (loanError) throw loanError
 
+      if (initialLoan && originalWallet && String(initialLoan.wallet_id) !== String(form.wallet_id)) {
+        await supabase.from('wallets').update({ balance: parseFloat(originalWallet.balance) + originalPrincipal }).eq('id', originalWallet.id)
+      }
       if (form.wallet_id && selectedWallet) {
-        await supabase.from('wallets').update({ balance: parseFloat(selectedWallet.balance) - principal }).eq('id', form.wallet_id)
+        const newBalance = initialLoan && String(initialLoan.wallet_id) === String(form.wallet_id)
+          ? parseFloat(selectedWallet.balance) + originalPrincipal - principal
+          : parseFloat(selectedWallet.balance) - principal
+        await supabase.from('wallets').update({ balance: newBalance }).eq('id', form.wallet_id)
       }
 
       onSaved(data)
@@ -226,7 +245,7 @@ function AddLoanModal({ userId, onClose, onSaved }) {
     <div className="animate-overlay-in" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="animate-modal-in" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 20, width: '100%', maxWidth: 460, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, backgroundColor: 'var(--card)', zIndex: 1 }}>
-          <h2 style={{ fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>New Loan</h2>
+          <h2 style={{ fontFamily: "'Cabinet Grotesk', sans-serif", fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: 0 }}>{initialLoan ? 'Edit Loan' : 'New Loan'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -300,7 +319,7 @@ function AddLoanModal({ userId, onClose, onSaved }) {
           <div style={{ display: 'flex', gap: 10 }}>
             <button type="button" onClick={onClose} style={{ flex: 1, padding: '10px 0', backgroundColor: 'transparent', border: '1px solid var(--border)', borderRadius: 12, fontSize: 13, fontWeight: 500, color: 'var(--text-muted)', cursor: 'pointer' }}>Cancel</button>
             <button type="submit" disabled={saving} style={{ flex: 1, padding: '10px 0', backgroundColor: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              {saving ? <><Loader2 size={13} className="animate-spin" /> Saving...</> : 'Record Loan'}
+              {saving ? <><Loader2 size={13} className="animate-spin" /> Saving...</> : initialLoan ? 'Save Changes' : 'Record Loan'}
             </button>
           </div>
         </form>
@@ -310,7 +329,7 @@ function AddLoanModal({ userId, onClose, onSaved }) {
 }
 
 // Loan Card with payment history
-function LoanCard({ loan, userId, onDelete, onUpdated }) {
+function LoanCard({ loan, userId, onDelete, onEdit, onUpdated }) {
   const [payments, setPayments] = useState([])
   const [loadingPayments, setLoadingPayments] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -399,12 +418,15 @@ function LoanCard({ loan, userId, onDelete, onUpdated }) {
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
               {loan.status !== 'returned' && (
                 <button onClick={() => setShowPayModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '5px 10px', backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   <Plus size={11} /> Payment
                 </button>
               )}
+              <button onClick={() => onEdit(loan)} title="Edit loan" aria-label={`Edit loan for ${loan.borrower_name}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 5, backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <Pencil size={12} />
+              </button>
               <button onClick={() => onDelete(loan.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 5, backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#fca5a5' }}
                 onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
                 onMouseLeave={e => e.currentTarget.style.color = '#fca5a5'}
@@ -494,6 +516,7 @@ export default function LoansSection({ userId, currency = 'PHP', rate = 1 }) {
   const [loans, setLoans] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingLoan, setEditingLoan] = useState(null)
   const [filter, setFilter] = useState('Active')
 
   useEffect(() => { fetchLoans() }, [])
@@ -583,7 +606,7 @@ export default function LoansSection({ userId, currency = 'PHP', rate = 1 }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map(loan => (
-              <LoanCard key={loan.id} loan={loan} userId={userId} onDelete={handleDelete} onUpdated={handleUpdated} />
+              <LoanCard key={loan.id} loan={loan} userId={userId} onDelete={handleDelete} onEdit={setEditingLoan} onUpdated={handleUpdated} />
             ))}
           </div>
         )}
@@ -591,6 +614,15 @@ export default function LoansSection({ userId, currency = 'PHP', rate = 1 }) {
 
       {showAddModal && (
         <AddLoanModal userId={userId} onClose={() => setShowAddModal(false)} onSaved={loan => setLoans(prev => [loan, ...prev])} />
+      )}
+
+      {editingLoan && (
+        <AddLoanModal
+          userId={userId}
+          initialLoan={editingLoan}
+          onClose={() => setEditingLoan(null)}
+          onSaved={loan => setLoans(prev => prev.map(current => current.id === loan.id ? loan : current))}
+        />
       )}
     </>
   )

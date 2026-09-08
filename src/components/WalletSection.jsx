@@ -78,7 +78,13 @@ function WalletModal({ wallet, userId, onClose, onSaved }) {
   )
 }
 
-function TransferModal({ wallets, onClose, onTransferred }) {
+function TransferModal({
+  wallets,
+  userId,
+  onClose,
+  onTransferred,
+  onLogged,
+}) {
   const [fromId, setFromId] = useState(wallets[0]?.id || '')
   const [toId, setToId] = useState(wallets[1]?.id || '')
   const [amount, setAmount] = useState('')
@@ -118,6 +124,23 @@ function TransferModal({ wallets, onClose, onTransferred }) {
         supabase.from('wallets').update({ balance: newFromBalance }).eq('id', fromId).select().single(),
         supabase.from('wallets').update({ balance: newToBalance }).eq('id', toId).select().single(),
       ])
+
+      const { error: logError } = await supabase
+        .from('wallet_activity_logs')
+        .insert([{
+          user_id: userId,
+          activity_type: 'transfer',
+          amount: parseFloat(amount),
+          fee: parseFloat(fee || 0),
+          from_wallet_id: fromId,
+          to_wallet_id: toId,
+        }])
+
+      if (logError) {
+        console.error('Failed to log wallet transfer:', logError)
+      } else {
+        onLogged?.()
+      }
 
       onTransferred(updatedFrom, updatedTo)
       onClose()
@@ -212,7 +235,12 @@ function TransferModal({ wallets, onClose, onTransferred }) {
   )
 }
 
-export default function WalletSection({ userId, currency = 'PHP', rate = 1 }) {
+export default function WalletSection({
+  userId,
+  currency = 'PHP',
+  rate = 1,
+  onActivityLogged,
+}) {
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -328,7 +356,13 @@ export default function WalletSection({ userId, currency = 'PHP', rate = 1 }) {
       )}
 
       {showTransfer && (
-        <TransferModal wallets={wallets} onClose={() => setShowTransfer(false)} onTransferred={handleTransferred} />
+        <TransferModal
+          wallets={wallets}
+          userId={userId}
+          onClose={() => setShowTransfer(false)}
+          onTransferred={handleTransferred}
+          onLogged={onActivityLogged}
+        />
       )}
     </>
   )

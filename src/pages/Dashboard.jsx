@@ -13,6 +13,7 @@ import ExpenseItem from '../components/ExpenseItem'
 import AIInsights from '../components/AIInsights'
 import WalletSection from '../components/WalletSection'
 import IncomeSection from '../components/IncomeSection'
+import WalletActivityLogs from '../components/WalletActivityLogs'
 import BillsSection from '../components/BillsSection'
 import LoansSection from '../components/LoansSection'
 import BillReminders from '../components/BillReminders'
@@ -197,6 +198,7 @@ export default function Dashboard({user,dark,setDark}){
   const [rates,setRates]=useState(null)
   const [budgets,setBudgets]=useState([])
   const [walletsList,setWalletsList]=useState([])
+  const [activityLogVersion,setActivityLogVersion]=useState(0)
   const [incomeList,setIncomeList]=useState([])
   const [billsList,setBillsList]=useState([])
   const [loansList,setLoansList]=useState([])
@@ -1140,11 +1142,19 @@ export default function Dashboard({user,dark,setDark}){
               userId={user.id}
               currency={currency}
               rate={rate}
+              onActivityLogged={()=>setActivityLogVersion(version=>version+1)}
             />
             <IncomeSection
               userId={user.id}
               currency={currency}
               rate={rate}
+              onActivityLogged={()=>setActivityLogVersion(version=>version+1)}
+            />
+            <WalletActivityLogs
+              userId={user.id}
+              currency={currency}
+              rate={rate}
+              refreshKey={activityLogVersion}
             />
           </div>
         ) : activeTab==='Bills' ? (
@@ -1162,6 +1172,8 @@ export default function Dashboard({user,dark,setDark}){
               currency={currency}
               rate={rate}
               onExpenseCreated={e=>setExpenses(p=>[e,...p])}
+              onExpenseUpdated={e=>setExpenses(p=>p.map(x=>x.id===e.id?e:x))}
+              onExpenseDeleted={id=>setExpenses(p=>p.filter(x=>x.id!==id))}
             />
           </div>
         ) : activeTab==='Loans' ? (

@@ -297,33 +297,41 @@ function PlanModal({
     setSaving(true)
     setError(null)
 
+    const planData = {
+      name: form.name.trim(),
+      start_date: form.start_date,
+      end_date: form.end_date || null,
+      notes: form.notes.trim() || null,
+    }
+
+    const request = initialPlan
+      ? supabase
+        .from('expense_plans')
+        .update(planData)
+        .eq('id', initialPlan.id)
+        .eq('user_id', userId)
+      : supabase
+        .from('expense_plans')
+        .insert([{
+          ...planData,
+          user_id: userId,
+        }])
+
     const {
       data,
-      error: insertError,
-    } = await supabase
-      .from('expense_plans')
-      .insert([
-        {
-          user_id: userId,
-          name: form.name.trim(),
-          start_date: form.start_date,
-          end_date:
-            form.end_date || null,
-          notes:
-            form.notes.trim() || null,
-        },
-      ])
+      error: saveError,
+    } = await request
       .select()
       .single()
 
-    if (insertError) {
+    if (saveError) {
       console.error(
-        'Failed to create expense plan:',
-        insertError
+        'Failed to save expense plan:',
+        saveError
       )
 
       setError(
-        'Failed to create the expense plan.'
+        'Failed to save the expense plan.'
       )
 
       setSaving(false)
@@ -332,7 +340,7 @@ function PlanModal({
 
     onSaved({
       ...data,
-      items: [],
+      items: initialPlan?.items || [],
     })
 
     onClose()
@@ -341,7 +349,11 @@ function PlanModal({
 
   return (
     <ModalShell
-      title="Create Expense Plan"
+      title={
+        initialPlan
+          ? 'Edit Expense Plan'
+          : 'Create Expense Plan'
+      }
       onClose={onClose}
     >
       <form
@@ -464,6 +476,7 @@ function PlanModal({
 function PlanItemModal({
   plan,
   userId,
+  initialItem = null,
   onClose,
   onSaved,
 }) {
@@ -474,12 +487,15 @@ function PlanItemModal({
     useState(true)
 
   const [form, setForm] = useState({
-    name: '',
-    category: 'Other',
-    estimated_amount: '',
-    scheduled_date:
+    name: initialItem?.name || '',
+    category: initialItem?.category || 'Other',
+    estimated_amount:
+      initialItem?.estimated_amount || '',
+    scheduled_date: initialItem?.scheduled_date ||
       plan.start_date || getToday(),
-    wallet_id: '',
+    wallet_id: initialItem?.wallet_id
+      ? String(initialItem.wallet_id)
+      : '',
   })
 
   const [saving, setSaving] =
@@ -515,7 +531,10 @@ function PlanItemModal({
 
       setWallets(walletData)
 
-      if (walletData.length > 0) {
+      if (
+        walletData.length > 0 &&
+        !initialItem?.wallet_id
+      ) {
         setForm((previous) => ({
           ...previous,
           wallet_id: String(
@@ -575,37 +594,45 @@ function PlanItemModal({
     setSaving(true)
     setError(null)
 
-    const {
-      data,
-      error: insertError,
-    } = await supabase
-      .from('expense_plan_items')
-      .insert([
-        {
+    const itemData = {
+      name: form.name.trim(),
+      category: form.category,
+      estimated_amount: amount,
+      scheduled_date: form.scheduled_date,
+      wallet_id: form.wallet_id,
+    }
+
+    const request = initialItem
+      ? supabase
+        .from('expense_plan_items')
+        .update(itemData)
+        .eq('id', initialItem.id)
+        .eq('user_id', userId)
+      : supabase
+        .from('expense_plan_items')
+        .insert([{
+          ...itemData,
           plan_id: plan.id,
           user_id: userId,
-          name: form.name.trim(),
-          category: form.category,
-          estimated_amount: amount,
-          scheduled_date:
-            form.scheduled_date,
-          wallet_id:
-            form.wallet_id,
           status: 'pending',
           is_spent: false,
-        },
-      ])
+        }])
+
+    const {
+      data,
+      error: saveError,
+    } = await request
       .select()
       .single()
 
-    if (insertError) {
+    if (saveError) {
       console.error(
-        'Failed to create planned expense:',
-        insertError
+        'Failed to save planned expense:',
+        saveError
       )
 
       setError(
-        'Failed to add the planned expense.'
+        'Failed to save the planned expense.'
       )
 
       setSaving(false)
@@ -616,7 +643,8 @@ function PlanItemModal({
       ...data,
       plannedWallet:
         selectedWallet || null,
-      extraExpenses: [],
+      extraExpenses:
+        initialItem?.extraExpenses || [],
     })
 
     onClose()
@@ -625,7 +653,11 @@ function PlanItemModal({
 
   return (
     <ModalShell
-      title={`Add to ${plan.name}`}
+      title={
+        initialItem
+          ? `Edit ${initialItem.name}`
+          : `Add to ${plan.name}`
+      }
       onClose={onClose}
     >
       <form
@@ -868,7 +900,11 @@ function PlanItemModal({
         <FormActions
           onClose={onClose}
           saving={saving}
-          submitLabel="Add Expense"
+          submitLabel={
+            initialItem
+              ? 'Save Changes'
+              : 'Add Expense'
+          }
         />
       </form>
     </ModalShell>
@@ -881,6 +917,8 @@ function WalletExpenseModal({
   defaultAmount,
   defaultDate,
   defaultWalletId,
+  originalAmount = 0,
+  originalWalletId = null,
   userId,
   confirmLabel,
   onClose,
@@ -1006,14 +1044,17 @@ function WalletExpenseModal({
       return
     }
 
-    if (
-      Number(
-        selectedWallet?.balance || 0
-      ) < finalAmount
-    ) {
+    const availableBalance =
+      Number(selectedWallet?.balance || 0) +
+      (String(walletId) ===
+        String(originalWalletId)
+        ? Number(originalAmount || 0)
+        : 0)
+
+    if (availableBalance < finalAmount) {
       setError(
         `Insufficient balance. Available: ${walletFmt(
-          selectedWallet?.balance || 0
+          availableBalance
         )}`
       )
       return
@@ -1322,19 +1363,20 @@ function ExtraExpenseModal({
   plan,
   item,
   userId,
+  initialExtra = null,
   onClose,
   onSaved,
 }) {
   const [form, setForm] = useState({
-    name: '',
-    category:
+    name: initialExtra?.name || '',
+    category: initialExtra?.category ||
       item.category || 'Other',
-    amount: '',
-    expense_date:
+    amount: initialExtra?.amount || '',
+    expense_date: initialExtra?.expense_date ||
       item.scheduled_date ||
       plan.start_date ||
       getToday(),
-    notes: '',
+    notes: initialExtra?.notes || '',
   })
 
   const [wallets, setWallets] =
@@ -1380,16 +1422,22 @@ function ExtraExpenseModal({
       setWallets(walletData)
 
       if (walletData.length > 0) {
-        const plannedWalletExists =
+        const savedWalletExists =
           walletData.some(
             (wallet) =>
               String(wallet.id) ===
-              String(item.wallet_id)
+              String(
+                initialExtra?.wallet_id ||
+                item.wallet_id
+              )
           )
 
         setWalletId(
-          plannedWalletExists
-            ? String(item.wallet_id)
+          savedWalletExists
+            ? String(
+              initialExtra?.wallet_id ||
+              item.wallet_id
+            )
             : String(walletData[0].id)
         )
       }
@@ -1398,7 +1446,11 @@ function ExtraExpenseModal({
     }
 
     fetchWallets()
-  }, [userId, item.wallet_id])
+  }, [
+    userId,
+    item.wallet_id,
+    initialExtra?.wallet_id,
+  ])
 
   const selectedWallet =
     wallets.find(
@@ -1456,10 +1508,26 @@ function ExtraExpenseModal({
         selectedWallet?.balance || 0
       )
 
-    if (walletBalance < amount) {
+    const originalAmount = Number(
+      initialExtra?.amount || 0
+    )
+
+    const originalWallet = wallets.find(
+      (wallet) =>
+        String(wallet.id) ===
+        String(initialExtra?.wallet_id)
+    )
+
+    const availableBalance = initialExtra &&
+      String(initialExtra.wallet_id) ===
+        String(walletId)
+      ? walletBalance + originalAmount
+      : walletBalance
+
+    if (availableBalance < amount) {
       setError(
         `Insufficient balance. Available: ${walletFmt(
-          walletBalance
+          availableBalance
         )}`
       )
       return
@@ -1469,26 +1537,32 @@ function ExtraExpenseModal({
     setError(null)
 
     try {
+      const expenseData = {
+        amount,
+        category: form.category || 'Other',
+        date: form.expense_date,
+        notes: `${plan.name} — ${item.name} — ${form.name.trim()}`,
+        payment_method: selectedWallet.type,
+        wallet_id: walletId,
+      }
+
+      const expenseRequest = initialExtra
+        ? supabase
+          .from('expenses')
+          .update(expenseData)
+          .eq('id', initialExtra.expense_id)
+          .eq('user_id', userId)
+        : supabase
+          .from('expenses')
+          .insert([{
+            ...expenseData,
+            user_id: userId,
+          }])
+
       const {
         data: expense,
         error: expenseError,
-      } = await supabase
-        .from('expenses')
-        .insert([
-          {
-            user_id: userId,
-            amount,
-            category:
-              form.category ||
-              'Other',
-            date:
-              form.expense_date,
-            notes: `${plan.name} — ${item.name} — ${form.name.trim()}`,
-            payment_method:
-              selectedWallet.type,
-            wallet_id: walletId,
-          },
-        ])
+      } = await expenseRequest
         .select()
         .single()
 
@@ -1496,87 +1570,95 @@ function ExtraExpenseModal({
         throw expenseError
       }
 
-      const {
-        error: walletError,
-      } = await supabase
-        .from('wallets')
-        .update({
-          balance:
-            walletBalance - amount,
-        })
-        .eq('id', walletId)
-        .eq('user_id', userId)
-
-      if (walletError) {
-        await supabase
-          .from('expenses')
-          .delete()
-          .eq('id', expense.id)
-
-        throw walletError
+      if (initialExtra && !originalWallet) {
+        throw new Error('Original wallet was not found.')
       }
+
+      const updatedWallets = initialExtra &&
+        String(initialExtra.wallet_id) !==
+          String(walletId)
+        ? [
+          {
+            id: originalWallet.id,
+            balance:
+              Number(originalWallet.balance || 0) +
+              originalAmount,
+          },
+          {
+            id: walletId,
+            balance: walletBalance - amount,
+          },
+        ]
+        : [{
+          id: walletId,
+          balance: walletBalance +
+            originalAmount - amount,
+        }]
+
+      for (const wallet of updatedWallets) {
+        const { error: walletError } = await supabase
+          .from('wallets')
+          .update({ balance: wallet.balance })
+          .eq('id', wallet.id)
+          .eq('user_id', userId)
+
+        if (walletError) throw walletError
+      }
+
+      const extraData = {
+        name: form.name.trim(),
+        category: form.category || 'Other',
+        amount,
+        expense_date: form.expense_date,
+        wallet_id: walletId,
+        expense_id: expense.id,
+        notes: form.notes.trim() || null,
+      }
+
+      const extraRequest = initialExtra
+        ? supabase
+          .from('expense_plan_extra_expenses')
+          .update(extraData)
+          .eq('id', initialExtra.id)
+          .eq('user_id', userId)
+        : supabase
+          .from('expense_plan_extra_expenses')
+          .insert([{
+            ...extraData,
+            user_id: userId,
+            plan_id: plan.id,
+            plan_item_id: item.id,
+          }])
 
       const {
         data: extraExpense,
         error: extraError,
-      } = await supabase
-        .from(
-          'expense_plan_extra_expenses'
-        )
-        .insert([
-          {
-            user_id: userId,
-            plan_id: plan.id,
-            plan_item_id: item.id,
-            name: form.name.trim(),
-            category:
-              form.category ||
-              'Other',
-            amount,
-            expense_date:
-              form.expense_date,
-            wallet_id: walletId,
-            expense_id: expense.id,
-            notes:
-              form.notes.trim() ||
-              null,
-          },
-        ])
+      } = await extraRequest
         .select()
         .single()
 
       if (extraError) {
-        await supabase
-          .from('expenses')
-          .delete()
-          .eq('id', expense.id)
-
-        await supabase
-          .from('wallets')
-          .update({
-            balance:
-              walletBalance,
-          })
-          .eq('id', walletId)
-          .eq('user_id', userId)
+        if (!initialExtra) {
+          await supabase
+            .from('expenses')
+            .delete()
+            .eq('id', expense.id)
+        }
 
         throw extraError
       }
 
-      onSaved(
-        extraExpense,
-        expense
-      )
+      onSaved(extraExpense, expense)
 
       onClose()
     } catch (submitError) {
       console.error(
-        'Failed to add extra expense:',
+        'Failed to save extra expense:',
         submitError
       )
 
       setError(
-        'Failed to record the extra expense.'
+        'Failed to save the extra expense.'
       )
     }
 
@@ -1585,7 +1667,11 @@ function ExtraExpenseModal({
 
   return (
     <ModalShell
-      title="Add Other Expense"
+      title={
+        initialExtra
+          ? 'Edit Other Expense'
+          : 'Add Other Expense'
+      }
       onClose={onClose}
       maxWidth={440}
     >
@@ -2035,6 +2121,8 @@ export default function ExpensePlansSection({
   currency = 'PHP',
   rate = 1,
   onExpenseCreated,
+  onExpenseUpdated,
+  onExpenseDeleted,
 }) {
   const [plans, setPlans] =
     useState([])
@@ -2045,13 +2133,25 @@ export default function ExpensePlansSection({
   const [showPlanModal, setShowPlanModal] =
     useState(false)
 
+  const [editingPlan, setEditingPlan] =
+    useState(null)
+
   const [addingToPlan, setAddingToPlan] =
+    useState(null)
+
+  const [editingItem, setEditingItem] =
     useState(null)
 
   const [confirmingItem, setConfirmingItem] =
     useState(null)
 
+  const [editingConfirmedItem, setEditingConfirmedItem] =
+    useState(null)
+
   const [addingExtraExpense, setAddingExtraExpense] =
+    useState(null)
+
+  const [editingExtraExpense, setEditingExtraExpense] =
     useState(null)
 
   const [expandedPlans, setExpandedPlans] =
@@ -2068,6 +2168,16 @@ export default function ExpensePlansSection({
   const [
     confirmDeleteItem,
     setConfirmDeleteItem,
+  ] = useState(null)
+
+  const [
+    confirmDeleteConfirmedItem,
+    setConfirmDeleteConfirmedItem,
+  ] = useState(null)
+
+  const [
+    confirmDeleteExtra,
+    setConfirmDeleteExtra,
   ] = useState(null)
 
   useEffect(() => {
@@ -2239,8 +2349,14 @@ export default function ExpensePlansSection({
   }
 
   function handlePlanSaved(plan) {
-    setPlans((previous) =>
-      [...previous, plan].sort(
+    setPlans((previous) => {
+      return [
+        ...previous.filter(
+          (currentPlan) =>
+            currentPlan.id !== plan.id
+        ),
+        plan,
+      ].sort(
         (first, second) =>
           new Date(
             first.start_date
@@ -2249,7 +2365,7 @@ export default function ExpensePlansSection({
             second.start_date
           )
       )
-    )
+    })
 
     setExpandedPlans((previous) => ({
       ...previous,
@@ -2267,7 +2383,10 @@ export default function ExpensePlansSection({
           ? {
             ...plan,
             items: [
-              ...(plan.items || []),
+              ...(plan.items || []).filter(
+                (currentItem) =>
+                  currentItem.id !== item.id
+              ),
               item,
             ].sort(
               (first, second) =>
@@ -2355,6 +2474,128 @@ export default function ExpensePlansSection({
           : plan
       )
     )
+  }
+
+  function updateExtraExpenseInItem(
+    planId,
+    itemId,
+    updatedExtra
+  ) {
+    setPlans((previous) =>
+      previous.map((plan) =>
+        plan.id === planId
+          ? {
+            ...plan,
+            items: plan.items.map((item) =>
+              item.id === itemId
+                ? {
+                  ...item,
+                  extraExpenses: (
+                    item.extraExpenses || []
+                  ).map((extra) =>
+                    extra.id === updatedExtra.id
+                      ? updatedExtra
+                      : extra
+                  ),
+                }
+                : item
+            ),
+          }
+          : plan
+      )
+    )
+  }
+
+  async function handleDeleteExtra({
+    planId,
+    itemId,
+    extra,
+  }) {
+    const { data: wallet, error: walletError } =
+      await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('id', extra.wallet_id)
+        .eq('user_id', userId)
+        .single()
+
+    if (walletError) {
+      console.error(
+        'Failed to find other expense wallet:',
+        walletError
+      )
+      return
+    }
+
+    const { error: extraError } = await supabase
+      .from('expense_plan_extra_expenses')
+      .delete()
+      .eq('id', extra.id)
+      .eq('user_id', userId)
+
+    if (extraError) {
+      console.error(
+        'Failed to delete other expense:',
+        extraError
+      )
+      return
+    }
+
+    const { error: expenseError } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', extra.expense_id)
+      .eq('user_id', userId)
+
+    if (expenseError) {
+      console.error(
+        'Failed to delete linked expense:',
+        expenseError
+      )
+      return
+    }
+
+    const { error: balanceError } = await supabase
+      .from('wallets')
+      .update({
+        balance:
+          Number(wallet.balance || 0) +
+          Number(extra.amount || 0),
+      })
+      .eq('id', extra.wallet_id)
+      .eq('user_id', userId)
+
+    if (balanceError) {
+      console.error(
+        'Failed to restore wallet balance:',
+        balanceError
+      )
+      return
+    }
+
+    setPlans((previous) =>
+      previous.map((plan) =>
+        plan.id === planId
+          ? {
+            ...plan,
+            items: plan.items.map((item) =>
+              item.id === itemId
+                ? {
+                  ...item,
+                  extraExpenses: (
+                    item.extraExpenses || []
+                  ).filter((currentExtra) =>
+                    currentExtra.id !== extra.id
+                  ),
+                }
+                : item
+            ),
+          }
+          : plan
+      )
+    )
+
+    onExpenseDeleted?.(extra.expense_id)
   }
 
   async function confirmMainExpense({
@@ -2464,6 +2705,176 @@ export default function ExpensePlansSection({
     )
 
     onExpenseCreated?.(expense)
+  }
+
+  async function editConfirmedMainExpense({
+    plan,
+    item,
+    amount,
+    expenseDate,
+    walletId,
+    selectedWallet,
+  }) {
+    const { data: originalWallet, error: walletError } =
+      await supabase
+        .from('wallets')
+        .select('id, balance')
+        .eq('id', item.wallet_id)
+        .eq('user_id', userId)
+        .single()
+
+    if (walletError) throw walletError
+
+    const { data: expense, error: expenseError } =
+      await supabase
+        .from('expenses')
+        .update({
+          amount,
+          category: item.category || 'Other',
+          date: expenseDate,
+          notes: `${plan.name} — ${item.name}`,
+          payment_method: selectedWallet.type,
+          wallet_id: walletId,
+        })
+        .eq('id', item.expense_id)
+        .eq('user_id', userId)
+        .select()
+        .single()
+
+    if (expenseError) throw expenseError
+
+    const originalAmount = Number(
+      item.actual_amount || 0
+    )
+
+    const walletUpdates = String(item.wallet_id) ===
+      String(walletId)
+      ? [{
+        id: walletId,
+        balance:
+          Number(selectedWallet.balance || 0) +
+          originalAmount - amount,
+      }]
+      : [
+        {
+          id: originalWallet.id,
+          balance:
+            Number(originalWallet.balance || 0) +
+            originalAmount,
+        },
+        {
+          id: walletId,
+          balance:
+            Number(selectedWallet.balance || 0) - amount,
+        },
+      ]
+
+    for (const wallet of walletUpdates) {
+      const { error } = await supabase
+        .from('wallets')
+        .update({ balance: wallet.balance })
+        .eq('id', wallet.id)
+        .eq('user_id', userId)
+
+      if (error) throw error
+    }
+
+    const { data: updatedItem, error: itemError } =
+      await supabase
+        .from('expense_plan_items')
+        .update({
+          actual_amount: amount,
+          wallet_id: walletId,
+        })
+        .eq('id', item.id)
+        .eq('user_id', userId)
+        .select()
+        .single()
+
+    if (itemError) throw itemError
+
+    updatePlanItem(plan.id, updatedItem, selectedWallet)
+    onExpenseUpdated?.(expense)
+  }
+
+  async function handleDeleteConfirmedMainExpense({
+    plan,
+    item,
+  }) {
+    const { data: wallet, error: walletError } =
+      await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('id', item.wallet_id)
+        .eq('user_id', userId)
+        .single()
+
+    if (walletError) {
+      console.error(
+        'Failed to find main expense wallet:',
+        walletError
+      )
+      return
+    }
+
+    const { error: expenseError } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', item.expense_id)
+      .eq('user_id', userId)
+
+    if (expenseError) {
+      console.error(
+        'Failed to delete main expense:',
+        expenseError
+      )
+      return
+    }
+
+    const { data: updatedItem, error: itemError } =
+      await supabase
+        .from('expense_plan_items')
+        .update({
+          actual_amount: null,
+          status: 'pending',
+          is_spent: false,
+          expense_id: null,
+          confirmed_at: null,
+          spent_at: null,
+        })
+        .eq('id', item.id)
+        .eq('user_id', userId)
+        .select()
+        .single()
+
+    if (itemError) {
+      console.error(
+        'Failed to restore planned expense:',
+        itemError
+      )
+      return
+    }
+
+    const { error: balanceError } = await supabase
+      .from('wallets')
+      .update({
+        balance:
+          Number(wallet.balance || 0) +
+          Number(item.actual_amount || 0),
+      })
+      .eq('id', item.wallet_id)
+      .eq('user_id', userId)
+
+    if (balanceError) {
+      console.error(
+        'Failed to restore wallet balance:',
+        balanceError
+      )
+      return
+    }
+
+    updatePlanItem(plan.id, updatedItem)
+    onExpenseDeleted?.(item.expense_id)
   }
 
   function togglePlan(planId) {
@@ -3032,11 +3443,11 @@ export default function ExpensePlansSection({
                         gap: 5,
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setAddingToPlan(
-                            plan
+                       <button
+                         type="button"
+                         onClick={() =>
+                           setAddingToPlan(
+                             plan
                           )
                         }
                         title="Add planned expense"
@@ -3057,11 +3468,36 @@ export default function ExpensePlansSection({
                             'var(--text-muted)',
                           cursor: 'pointer',
                         }}
-                      >
-                        <Plus size={13} />
-                      </button>
+                       >
+                         <Plus size={13} />
+                       </button>
 
-                      <button
+                       <button
+                         type="button"
+                         onClick={() =>
+                           setEditingPlan(plan)
+                         }
+                         title="Edit plan"
+                         aria-label={`Edit ${plan.name}`}
+                         style={{
+                           width: 32,
+                           height: 32,
+                           display: 'flex',
+                           alignItems: 'center',
+                           justifyContent: 'center',
+                           backgroundColor:
+                             'var(--input-bg)',
+                           border:
+                             '1px solid var(--border)',
+                           borderRadius: 10,
+                           color: 'var(--text-muted)',
+                           cursor: 'pointer',
+                         }}
+                       >
+                         <Pencil size={13} />
+                       </button>
+
+                       <button
                         type="button"
                         onClick={() =>
                           setConfirmDeletePlan(
@@ -3597,10 +4033,92 @@ export default function ExpensePlansSection({
                                     )}
                                   </button>
 
-                                  {!item.is_spent &&
-                                    item.status !==
-                                    'confirmed' && (
-                                      <button
+                                  {(item.is_spent ||
+                                    item.status ===
+                                    'confirmed') && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setEditingConfirmedItem({
+                                          plan,
+                                          item,
+                                        })
+                                      }
+                                      title="Edit confirmed expense"
+                                      aria-label={`Edit ${item.name}`}
+                                      style={{
+                                        flexShrink: 0,
+                                        display: 'flex',
+                                        padding: 3,
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      <Pencil size={12} />
+                                    </button>
+                                  )}
+
+                                  {(item.is_spent ||
+                                    item.status ===
+                                    'confirmed') && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setConfirmDeleteConfirmedItem({
+                                          plan,
+                                          item,
+                                        })
+                                      }
+                                      title="Delete confirmed expense"
+                                      aria-label={`Delete ${item.name}`}
+                                      style={{
+                                        flexShrink: 0,
+                                        display: 'flex',
+                                        padding: 3,
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#fca5a5',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  )}
+
+                                   {!item.is_spent &&
+                                     item.status !==
+                                     'confirmed' && (
+                                       <button
+                                         type="button"
+                                         onClick={() =>
+                                           setEditingItem({
+                                             plan,
+                                             item,
+                                           })
+                                         }
+                                         title="Edit planned expense"
+                                         aria-label={`Edit ${item.name}`}
+                                         style={{
+                                           flexShrink: 0,
+                                           display: 'flex',
+                                           padding: 3,
+                                           background: 'none',
+                                           border: 'none',
+                                           color:
+                                             'var(--text-muted)',
+                                           cursor: 'pointer',
+                                         }}
+                                       >
+                                         <Pencil size={12} />
+                                       </button>
+                                     )}
+
+                                   {!item.is_spent &&
+                                     item.status !==
+                                     'confirmed' && (
+                                       <button
                                         type="button"
                                         onClick={() =>
                                           setConfirmDeleteItem(
@@ -3911,6 +4429,59 @@ export default function ExpensePlansSection({
                                                   extra.amount
                                                 )}
                                               </strong>
+
+                                              <div
+                                                style={{
+                                                  display: 'flex',
+                                                  gap: 3,
+                                                }}
+                                              >
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    setEditingExtraExpense({
+                                                      plan,
+                                                      item,
+                                                      extra,
+                                                    })
+                                                  }
+                                                  title="Edit other expense"
+                                                  aria-label={`Edit ${extra.name}`}
+                                                  style={{
+                                                    display: 'flex',
+                                                    padding: 3,
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: 'var(--text-muted)',
+                                                    cursor: 'pointer',
+                                                  }}
+                                                >
+                                                  <Pencil size={12} />
+                                                </button>
+
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    setConfirmDeleteExtra({
+                                                      planId: plan.id,
+                                                      itemId: item.id,
+                                                      extra,
+                                                    })
+                                                  }
+                                                  title="Delete other expense"
+                                                  aria-label={`Delete ${extra.name}`}
+                                                  style={{
+                                                    display: 'flex',
+                                                    padding: 3,
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: '#fca5a5',
+                                                    cursor: 'pointer',
+                                                  }}
+                                                >
+                                                  <Trash2 size={12} />
+                                                </button>
+                                              </div>
                                             </div>
                                           )
                                         )}
@@ -3942,6 +4513,17 @@ export default function ExpensePlansSection({
         />
       )}
 
+      {editingPlan && (
+        <PlanModal
+          userId={userId}
+          initialPlan={editingPlan}
+          onClose={() =>
+            setEditingPlan(null)
+          }
+          onSaved={handlePlanSaved}
+        />
+      )}
+
       {addingToPlan && (
         <PlanItemModal
           plan={addingToPlan}
@@ -3952,6 +4534,23 @@ export default function ExpensePlansSection({
           onSaved={(item) =>
             handleItemSaved(
               addingToPlan.id,
+              item
+            )
+          }
+        />
+      )}
+
+      {editingItem && (
+        <PlanItemModal
+          plan={editingItem.plan}
+          initialItem={editingItem.item}
+          userId={userId}
+          onClose={() =>
+            setEditingItem(null)
+          }
+          onSaved={(item) =>
+            handleItemSaved(
+              editingItem.plan.id,
               item
             )
           }
@@ -4028,6 +4627,71 @@ export default function ExpensePlansSection({
         />
       )}
 
+      {editingConfirmedItem && (
+        <WalletExpenseModal
+          title="Edit Confirmed Expense"
+          description={`${editingConfirmedItem.plan.name} — ${editingConfirmedItem.item.name}`}
+          defaultAmount={
+            editingConfirmedItem.item.actual_amount
+          }
+          defaultDate={
+            editingConfirmedItem.item.spent_at?.slice(0, 10) ||
+            editingConfirmedItem.item.scheduled_date ||
+            getToday()
+          }
+          defaultWalletId={
+            editingConfirmedItem.item.wallet_id
+          }
+          originalAmount={
+            editingConfirmedItem.item.actual_amount
+          }
+          originalWalletId={
+            editingConfirmedItem.item.wallet_id
+          }
+          userId={userId}
+          confirmLabel="Save Changes"
+          onClose={() =>
+            setEditingConfirmedItem(null)
+          }
+          onConfirm={({
+            amount,
+            expenseDate,
+            walletId,
+            selectedWallet,
+          }) =>
+            editConfirmedMainExpense({
+              plan: editingConfirmedItem.plan,
+              item: editingConfirmedItem.item,
+              amount,
+              expenseDate,
+              walletId,
+              selectedWallet,
+            })
+          }
+        />
+      )}
+
+      {editingExtraExpense && (
+        <ExtraExpenseModal
+          plan={editingExtraExpense.plan}
+          item={editingExtraExpense.item}
+          initialExtra={editingExtraExpense.extra}
+          userId={userId}
+          onClose={() =>
+            setEditingExtraExpense(null)
+          }
+          onSaved={(extraExpense, expense) => {
+            updateExtraExpenseInItem(
+              editingExtraExpense.plan.id,
+              editingExtraExpense.item.id,
+              extraExpense
+            )
+
+            onExpenseUpdated?.(expense)
+          }}
+        />
+      )}
+
       {confirmDeletePlan && (
         <ConfirmDialog
           title="Delete Expense Plan?"
@@ -4055,6 +4719,34 @@ export default function ExpensePlansSection({
           }
           onClose={() =>
             setConfirmDeleteItem(null)
+          }
+        />
+      )}
+
+      {confirmDeleteConfirmedItem && (
+        <ConfirmDialog
+          title="Delete Confirmed Expense?"
+          message={`Delete the recorded expense for "${confirmDeleteConfirmedItem.item.name}" and restore ${fmt(confirmDeleteConfirmedItem.item.actual_amount)} to its wallet? The planned expense will remain.`}
+          onConfirm={() =>
+            handleDeleteConfirmedMainExpense(
+              confirmDeleteConfirmedItem
+            )
+          }
+          onClose={() =>
+            setConfirmDeleteConfirmedItem(null)
+          }
+        />
+      )}
+
+      {confirmDeleteExtra && (
+        <ConfirmDialog
+          title="Delete Other Expense?"
+          message={`Delete "${confirmDeleteExtra.extra.name}" and restore ${fmt(confirmDeleteExtra.extra.amount)} to its wallet?`}
+          onConfirm={() =>
+            handleDeleteExtra(confirmDeleteExtra)
+          }
+          onClose={() =>
+            setConfirmDeleteExtra(null)
           }
         />
       )}

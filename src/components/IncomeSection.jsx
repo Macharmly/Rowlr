@@ -156,7 +156,7 @@ function IncomeModal({ userId, existing, onClose, onSaved }) {
   )
 }
 
-function ReceiveIncomeModal({ income, wallets, currency, rate, onClose, onReceived }) {
+function ReceiveIncomeModal({ income, wallets, currency, rate, onClose, onReceived, onLogged }) {
   const [walletId, setWalletId] = useState(wallets[0]?.id || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -210,6 +210,22 @@ function ReceiveIncomeModal({ income, wallets, currency, rate, onClose, onReceiv
       setError('Failed to mark income as received.')
       setSaving(false)
       return
+    }
+
+    const { error: logError } = await supabase
+      .from('wallet_activity_logs')
+      .insert([{
+        user_id: income.user_id,
+        activity_type: 'income_received',
+        amount: parseFloat(income.amount || 0),
+        to_wallet_id: walletId,
+        income_id: income.id,
+      }])
+
+    if (logError) {
+      console.error('Failed to log received income:', logError)
+    } else {
+      onLogged?.()
     }
 
     onReceived(updatedIncome, updatedWallet)
@@ -299,7 +315,12 @@ function ReceiveIncomeModal({ income, wallets, currency, rate, onClose, onReceiv
   )
 }
 
-export default function IncomeSection({ userId, currency = 'PHP', rate = 1 }) {
+export default function IncomeSection({
+  userId,
+  currency = 'PHP',
+  rate = 1,
+  onActivityLogged,
+}) {
   const [income, setIncome] = useState([])
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -586,6 +607,7 @@ export default function IncomeSection({ userId, currency = 'PHP', rate = 1 }) {
           rate={rate}
           onClose={() => setReceivingIncome(null)}
           onReceived={handleReceived}
+          onLogged={onActivityLogged}
         />
       )}
 
