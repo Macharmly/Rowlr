@@ -12,7 +12,7 @@ const s = {
   select: { width: '100%', padding: '10px 14px', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 13, color: 'var(--text)', outline: 'none' },
 }
 
-export default function AddExpenseModal({ onClose, onSaved, userId, currency = 'PHP', rate = 1 }) {
+export default function AddExpenseModal({ onClose, onSaved, onActivityLogged, userId, currency = 'PHP', rate = 1 }) {
   const [form, setForm] = useState({
     amount: '', category: 'Food', date: new Date().toISOString().split('T')[0],
     notes: '', payment_method: 'Cash', wallet_id: '',
@@ -82,6 +82,16 @@ export default function AddExpenseModal({ onClose, onSaved, userId, currency = '
         if (selectedWallet) {
           const newBalance = parseFloat(selectedWallet.balance) - phpAmount
           await supabase.from('wallets').update({ balance: newBalance }).eq('id', form.wallet_id)
+
+          const { error: logError } = await supabase.from('wallet_activity_logs').insert([{
+            user_id: userId,
+            activity_type: 'expense_paid',
+            amount: phpAmount,
+            from_wallet_id: form.wallet_id,
+            expense_id: data.id,
+          }])
+          if (logError) console.error('Failed to log expense payment:', logError)
+          else onActivityLogged?.()
         }
       }
 

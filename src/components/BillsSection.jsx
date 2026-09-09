@@ -183,6 +183,15 @@ function PayBillModal({ bill, userId, onClose, onPaid }) {
       const newBalance = parseFloat(selectedWallet.balance) - parseFloat(bill.amount)
       await supabase.from('wallets').update({ balance: newBalance }).eq('id', walletId)
 
+      const { error: logError } = await supabase.from('wallet_activity_logs').insert([{
+        user_id: userId,
+        activity_type: 'bill_paid',
+        amount: parseFloat(bill.amount),
+        from_wallet_id: walletId,
+        bill_id: bill.id,
+      }])
+      if (logError) console.error('Failed to log bill payment:', logError)
+
       // Auto-add to expenses
       await supabase.from('expenses').insert([{
         user_id: userId,

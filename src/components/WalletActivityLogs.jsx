@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRightLeft, Inbox, Loader2, TrendingUp } from 'lucide-react'
+import { ArrowRightLeft, Inbox, Loader2, Receipt, TrendingDown, TrendingUp } from 'lucide-react'
 
 import { supabase } from '../lib/supabase'
 import { fmt as fmtCurrency } from '../lib/currency'
@@ -84,7 +84,7 @@ export default function WalletActivityLogs({
             color: 'var(--text)',
           }}
         >
-          Wallet & Income Logs
+          Money Movement Log
         </h3>
       </div>
 
@@ -106,7 +106,7 @@ export default function WalletActivityLogs({
             color: 'var(--text-subtle)',
           }}
         >
-          Transfers and received income will appear here.
+          Income, expenses, bill payments, and transfers will appear here.
         </p>
       ) : (
         <div
@@ -118,6 +118,18 @@ export default function WalletActivityLogs({
         >
           {logs.map((log) => {
             const isTransfer = log.activity_type === 'transfer'
+            const isIncome = log.activity_type === 'income_received'
+            const isExpense = log.activity_type === 'expense_paid'
+            const isBillPayment = log.activity_type === 'bill_paid'
+            const isOutflow = isExpense || isBillPayment
+            const activity = isTransfer
+              ? { label: 'Wallet transfer', icon: ArrowRightLeft, color: '#2563eb', background: '#eff6ff' }
+              : isIncome
+                ? { label: 'Income received', icon: TrendingUp, color: '#16a34a', background: '#f0fdf4' }
+                : isBillPayment
+                  ? { label: 'Bill paid', icon: Receipt, color: '#dc2626', background: '#fef2f2' }
+                  : { label: 'Expense paid', icon: TrendingDown, color: '#dc2626', background: '#fef2f2' }
+            const ActivityIcon = activity.icon
             const date = new Date(log.created_at).toLocaleString(
               'en-PH',
               { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
@@ -144,27 +156,27 @@ export default function WalletActivityLogs({
                     style={{
                       display: 'flex',
                       padding: 7,
-                      backgroundColor: isTransfer ? '#eff6ff' : '#f0fdf4',
+                      backgroundColor: activity.background,
                       borderRadius: 9,
-                      color: isTransfer ? '#2563eb' : '#16a34a',
+                      color: activity.color,
                     }}
                   >
-                    {isTransfer ? <ArrowRightLeft size={13} /> : <TrendingUp size={13} />}
+                    <ActivityIcon size={13} />
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 12, fontWeight: 650, color: 'var(--text)' }}>
-                      {isTransfer ? 'Wallet transfer' : 'Income received'}
+                      {activity.label}
                     </p>
                     <p style={{ margin: '2px 0 0', fontSize: 10.5, color: 'var(--text-subtle)' }}>
                       {isTransfer
                         ? `${fromName} → ${toName}${Number(log.fee || 0) > 0 ? ` · Fee ${fmt(log.fee)}` : ''}`
-                        : `Added to ${toName}`}
+                        : isOutflow ? `Paid from ${fromName}` : `Added to ${toName}`}
                       {' · '}{date}
                     </p>
                   </div>
                 </div>
-                <strong style={{ flexShrink: 0, fontSize: 12, color: isTransfer ? 'var(--text)' : '#16a34a' }}>
-                  {isTransfer ? '' : '+'}{fmt(log.amount)}
+                <strong style={{ flexShrink: 0, fontSize: 12, color: isTransfer ? 'var(--text)' : activity.color }}>
+                  {isTransfer ? '' : isOutflow ? '-' : '+'}{fmt(log.amount)}
                 </strong>
               </div>
             )

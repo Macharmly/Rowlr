@@ -1247,6 +1247,7 @@ export default function Dashboard({user,dark,setDark}){
         <AddExpenseModal
           onClose={()=>setShowModal(false)}
           onSaved={e=>setExpenses(p=>[e,...p])}
+          onActivityLogged={()=>setActivityLogVersion(version=>version+1)}
           userId={user.id}
           currency={currency}
           rate={rate}
